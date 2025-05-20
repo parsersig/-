@@ -16,47 +16,38 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Optional, but good to have if configured
 };
 
-let app: FirebaseApp;
+let app: FirebaseApp | undefined = undefined; // Initialize as undefined
 let authInstance: Auth | null = null;
 
-// Initialize Firebase
+// Initialize Firebase only if not already initialized and apiKey is present
 if (!getApps().length) {
-  if (!firebaseConfig.apiKey) {
-    console.error("Firebase Build/Runtime Error: NEXT_PUBLIC_FIREBASE_API_KEY is not set. Firebase features requiring auth will not work. Please check your environment variables in .env.local or Vercel settings.");
-    // App can be initialized even with missing apiKey, but auth-dependent services will fail.
-    // We proceed to initialize app, but auth will remain null.
-     try {
-      // Attempt to initialize app even if some keys might be missing for build purposes,
-      // runtime will fail later if keys are truly absent for auth.
-      app = initializeApp(firebaseConfig); 
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Check for essential keys
+    try {
+      app = initializeApp(firebaseConfig);
+      authInstance = getAuth(app);
     } catch (e: any) {
-      console.error("Firebase Critical Error: Failed to initialize Firebase app, likely due to malformed config or missing API key:", e.message);
-      // In this case, app might not be initialized, and authInstance will definitely be null.
+      console.error("Firebase Critical Error: Failed to initialize Firebase app. Check your Firebase config values:", e.message);
+      // app remains undefined, authInstance remains null
     }
   } else {
-    app = initializeApp(firebaseConfig);
+    // Do not output console.error during build if keys are intentionally missing for "Firebase disabled" state
+    // console.warn("Firebase Warning: Firebase initialization skipped because API key or Project ID is missing. Firebase features will be unavailable.");
   }
 } else {
-  app = getApps()[0]; 
-}
-
-// Initialize Auth only if app was successfully initialized and apiKey is present
-if (typeof app !== 'undefined' && firebaseConfig.apiKey) {
-  try {
-    authInstance = getAuth(app);
-  } catch (e: any) {
-    console.error("Firebase Auth Error: Failed to getAuth instance, even with an API key. This might indicate issues with other Firebase config values or service availability:", e.message);
-    // authInstance remains null
+  app = getApps()[0];
+  // If app was initialized by getApps(), try to get auth if apiKey is present
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    try {
+        authInstance = getAuth(app);
+    } catch (e:any) {
+        console.error("Firebase Auth Error: Failed to getAuth instance on re-initialized app.", e.message);
+    }
   }
-} else if (typeof app !== 'undefined' && !firebaseConfig.apiKey) {
-  // This case is covered by the console.error during app initialization.
-  // authInstance will be null here.
 }
 
-
-// Emulators are commented out as they are not the current focus.
+// Emulators are commented out
 // if (process.env.NODE_ENV === 'development') {
-//   if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && authInstance) { // Check authInstance
+//   if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && authInstance) {
 //     try {
 //       console.log("Firebase: Connecting to Auth Emulator (localhost:9099)");
 //       connectAuthEmulator(authInstance, "http://localhost:9099", { disableWarnings: true });
@@ -67,3 +58,5 @@ if (typeof app !== 'undefined' && firebaseConfig.apiKey) {
 // }
 
 export { app, authInstance as auth };
+
+  

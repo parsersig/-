@@ -4,20 +4,20 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { 
-  Briefcase, 
-  Menu, 
-  UserCircle, 
-  ListChecks, 
-  MessageSquare, 
-  Bell, 
+import {
+  Briefcase,
+  Menu,
+  UserCircle,
+  ListChecks,
+  MessageSquare,
+  Bell,
   LogOut,
   Home,
   FilePlus2,
   Search,
   LogIn,
   UserPlus,
-  FileText // For "Мои отклики"
+  FileText
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -37,8 +37,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { auth } from '@/lib/firebase'; // Import auth
-import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
+
+// Firebase Auth is temporarily removed as per user request
+// import { auth } from '@/lib/firebase';
+// import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
 
 interface NavLink {
   href: string;
@@ -46,68 +48,57 @@ interface NavLink {
   icon: LucideIcon;
 }
 
+// Placeholder for user state
+interface AppUser {
+  isLoggedIn: boolean;
+  displayName?: string | null;
+  email?: string | null;
+  photoURL?: string | null;
+}
+
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
+  // Placeholder user state. Change isLoggedIn to true to test logged-in view.
+  const [user, setUser] = useState<AppUser>({ isLoggedIn: false });
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Simulate auth loading state
+
+  // Simulate auth loading and initial state (e.g., checking if user was previously logged in)
   useEffect(() => {
-    if (!auth) {
-      console.warn("Firebase Auth is not initialized. Skipping auth state listener.");
+    const timer = setTimeout(() => {
+      // Example: Simulate user is not logged in initially
+      // setUser({ isLoggedIn: false });
+      // Example: Simulate user is logged in
+      // setUser({ isLoggedIn: true, displayName: "Тестовый Пользователь", email: "test@example.com", photoURL: "https://placehold.co/40x40.png" });
       setIsLoadingAuth(false);
-      return;
-    }
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsLoadingAuth(false);
-    });
-    return () => unsubscribe(); // Cleanup subscription on unmount
+    }, 500);
+    return () => clearTimeout(timer);
   }, []);
 
-  const handleGoogleSignIn = async () => {
-    if (!auth) {
-      toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
-      return;
-    }
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      toast({
-        title: "Вход выполнен",
-        description: "Вы успешно вошли через Google.",
+  const handleLoginPlaceholder = () => {
+    setIsLoadingAuth(true);
+    setTimeout(() => {
+      setUser({
+        isLoggedIn: true,
+        displayName: "Гость (Демо)",
+        email: "guest@example.com",
+        photoURL: "https://placehold.co/40x40.png"
       });
+      setIsLoadingAuth(false);
+      toast({ title: "Вход (Демо)", description: "Вы вошли как гость." });
       setIsMobileMenuOpen(false);
-    } catch (error: any) {
-      console.error("Google Sign-In Error:", error);
-      toast({
-        title: "Ошибка входа",
-        description: error.message || "Не удалось войти через Google. Попробуйте еще раз.",
-        variant: "destructive",
-      });
-    }
+    }, 700);
   };
 
-  const handleLogout = async () => {
-    if (!auth) {
-      toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
-      return;
-    }
-    try {
-      await signOut(auth);
-      toast({
-        title: "Выход",
-        description: "Вы успешно вышли из системы.",
-      });
+  const handleLogoutPlaceholder = () => {
+    setIsLoadingAuth(true);
+    setTimeout(() => {
+      setUser({ isLoggedIn: false });
+      setIsLoadingAuth(false);
+      toast({ title: "Выход (Демо)", description: "Вы вышли из системы." });
       setIsMobileMenuOpen(false);
-    } catch (error: any) {
-      console.error("Logout Error:", error);
-      toast({
-        title: "Ошибка выхода",
-        description: error.message || "Не удалось выйти. Попробуйте еще раз.",
-        variant: "destructive",
-      });
-    }
+    }, 700);
   };
 
   const mainNavLinks: NavLink[] = [
@@ -124,7 +115,6 @@ export default function Header() {
   ];
 
   if (isLoadingAuth) {
-    // Можно показать скелетон или просто ничего не рендерить, пока идет проверка auth
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
         <div className="container flex h-16 items-center">
@@ -132,7 +122,6 @@ export default function Header() {
             <Briefcase className="h-7 w-7 text-accent" />
             <span className="font-bold text-lg sm:text-xl">Фриланс Ирбит</span>
           </Link>
-          {/* Placeholder for auth buttons or user menu while loading */}
           <div className="h-9 w-24 bg-muted/50 rounded animate-pulse ml-auto"></div>
         </div>
       </header>
@@ -146,7 +135,7 @@ export default function Header() {
           <Briefcase className="h-7 w-7 text-accent" />
           <span className="font-bold text-lg sm:text-xl">Фриланс Ирбит</span>
         </Link>
-        
+
         <nav className="hidden md:flex items-center space-x-1 sm:space-x-2">
           {mainNavLinks.map((link) => (
             <Button variant="ghost" asChild key={link.href}>
@@ -158,7 +147,7 @@ export default function Header() {
         </nav>
 
         <div className="hidden md:flex items-center ml-4">
-          {user ? (
+          {user.isLoggedIn ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
@@ -190,7 +179,7 @@ export default function Header() {
                   );
                 })}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-500 hover:!text-red-500 hover:!bg-red-500/10">
+                <DropdownMenuItem onClick={handleLogoutPlaceholder} className="cursor-pointer text-red-500 hover:!text-red-500 hover:!bg-red-500/10">
                   <LogOut className="mr-2 h-5 w-5" />
                   Выйти
                 </DropdownMenuItem>
@@ -198,10 +187,10 @@ export default function Header() {
             </DropdownMenu>
           ) : (
             <div className="space-x-1 sm:space-x-2">
-              <Button variant="outline" size="sm" className="hover:border-accent hover:text-accent" onClick={handleGoogleSignIn}>
+              <Button variant="outline" size="sm" className="hover:border-accent hover:text-accent" onClick={handleLoginPlaceholder}>
                 <LogIn className="mr-2 h-4 w-4" /> Войти
               </Button>
-              <Button variant="default" size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleGoogleSignIn}>
+              <Button variant="default" size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleLoginPlaceholder}>
                 <UserPlus className="mr-2 h-4 w-4" /> Регистрация
               </Button>
             </div>
@@ -218,17 +207,17 @@ export default function Header() {
             <SheetContent side="right" className="w-[280px] sm:w-[320px] pt-10 px-4">
               <nav className="flex flex-col space-y-2">
                 <SheetClose asChild>
-                    <Link href="/" className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50" onClick={() => setIsMobileMenuOpen(false)}>
-                        <Home className="mr-3 h-6 w-6 text-accent/80" /> Главная
-                    </Link>
+                  <Link href="/" className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Home className="mr-3 h-6 w-6 text-accent/80" /> Главная
+                  </Link>
                 </SheetClose>
-                
+
                 {mainNavLinks.map((link) => {
                   const IconComponent = link.icon;
                   return (
                     <SheetClose asChild key={link.href}>
-                      <Link 
-                        href={link.href} 
+                      <Link
+                        href={link.href}
                         className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50"
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
@@ -241,14 +230,14 @@ export default function Header() {
 
                 <div className="my-4 border-t border-border"></div>
 
-                {user ? (
+                {user.isLoggedIn ? (
                   <>
                     {userMenuLinks.map((link) => {
                       const IconComponent = link.icon;
                       return (
                         <SheetClose asChild key={link.href}>
-                          <Link 
-                            href={link.href} 
+                          <Link
+                            href={link.href}
                             className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50"
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
@@ -259,9 +248,9 @@ export default function Header() {
                       );
                     })}
                     <SheetClose asChild>
-                      <Button 
-                        variant="ghost" 
-                        onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }}
+                      <Button
+                        variant="ghost"
+                        onClick={() => { handleLogoutPlaceholder(); setIsMobileMenuOpen(false); }}
                         className="w-full flex items-center justify-start text-lg font-medium text-red-500 hover:text-red-500 p-3 rounded-md hover:bg-red-500/10"
                       >
                         <LogOut className="mr-3 h-6 w-6 text-red-500/80" />
@@ -272,19 +261,19 @@ export default function Header() {
                 ) : (
                   <>
                     <SheetClose asChild>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className="w-full text-lg py-5"
-                        onClick={() => { handleGoogleSignIn(); setIsMobileMenuOpen(false); }}
+                        onClick={() => { handleLoginPlaceholder(); setIsMobileMenuOpen(false); }}
                       >
                          <LogIn className="mr-2 h-5 w-5" /> Войти
                       </Button>
                     </SheetClose>
                     <SheetClose asChild>
-                      <Button 
-                        variant="default" 
+                      <Button
+                        variant="default"
                         className="w-full text-lg py-5 bg-accent text-accent-foreground hover:bg-accent/90"
-                        onClick={() => { handleGoogleSignIn(); setIsMobileMenuOpen(false); }}
+                        onClick={() => { handleLoginPlaceholder(); setIsMobileMenuOpen(false); }}
                       >
                         <UserPlus className="mr-2 h-5 w-5" /> Регистрация
                       </Button>
@@ -299,3 +288,5 @@ export default function Header() {
     </header>
   );
 }
+
+    
