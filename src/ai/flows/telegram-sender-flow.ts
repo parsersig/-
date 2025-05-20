@@ -24,9 +24,30 @@ const SendTelegramMessageOutputSchema = z.object({
 });
 export type SendTelegramMessageOutput = z.infer<typeof SendTelegramMessageOutputSchema>;
 
-// It's important that this function is async and is the only export from this file.
 export async function sendTelegramMessage(input: SendTelegramMessageInput): Promise<SendTelegramMessageOutput> {
-  return sendTelegramMessageFlow(input);
+  console.log('[Server Action] sendTelegramMessage invoked with input:', JSON.stringify(input));
+  try {
+    if (typeof sendTelegramMessageFlow !== 'function') {
+        console.error('[Server Action CRITICAL] sendTelegramMessageFlow is not a function. Genkit flow definition might have failed during server startup. Check Vercel deployment logs for Genkit initialization errors.');
+        return {
+            success: false,
+            message: 'Критическая ошибка сервера: Flow не определен. Проверьте логи сервера Vercel.',
+            telegramResponse: { error: 'Flow definition failed' },
+        };
+    }
+    const result = await sendTelegramMessageFlow(input);
+    console.log('[Server Action] sendTelegramMessageFlow returned:', JSON.stringify(result));
+    return result;
+  } catch (error: any) {
+    console.error('[Server Action CRITICAL] Unhandled error in sendTelegramMessage server action:', error.message, error.stack);
+    const digest = error.digest || 'N/A';
+    console.error('[Server Action CRITICAL] Error Digest:', digest);
+    return {
+      success: false,
+      message: `Произошла критическая серверная ошибка при вызове flow. Digest: ${digest}. Подробности в логах сервера Vercel.`,
+      telegramResponse: { error: error.message, digest: digest },
+    };
+  }
 }
 
 const sendTelegramMessageFlow = ai.defineFlow(
@@ -36,18 +57,26 @@ const sendTelegramMessageFlow = ai.defineFlow(
     outputSchema: SendTelegramMessageOutputSchema,
   },
   async ({ chatId, messageText }) => {
+    console.log(`[Genkit Flow - sendTelegramMessageFlow] Starting for chatId: ${chatId}. Message: "${messageText.substring(0, 50)}..."`);
+
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const genkitEnv = process.env.GENKIT_ENV;
+    const nodeEnv = process.env.NODE_ENV;
+
+    console.log(`[Genkit Flow - sendTelegramMessageFlow] Environment check: GENKIT_ENV=${genkitEnv}, NODE_ENV=${nodeEnv}`);
 
     if (!botToken) {
-      const serverType = process.env.GENKIT_ENV === 'dev' ? 'Genkit dev server' : 'Next.js server';
-      console.error(`TELEGRAM_BOT_TOKEN is not set in environment variables. Checked on: ${serverType}`);
+      const serverTypeDetail = `(GENKIT_ENV: ${genkitEnv}, NODE_ENV: ${nodeEnv})`;
+      console.error(`[Genkit Flow - sendTelegramMessageFlow] CRITICAL: TELEGRAM_BOT_TOKEN is not set or not accessible. Checked in environment: ${serverTypeDetail}`);
       return {
         success: false,
-        message: `Ошибка конфигурации: TELEGRAM_BOT_TOKEN не найден на сервере (${serverType}). Пожалуйста, добавьте его в файл .env.local и перезапустите ВСЕ серверные процессы (Next.js и Genkit, если он запущен отдельно). Убедитесь, что имя переменной и файла точные.`,
+        message: `Ошибка конфигурации: TELEGRAM_BOT_TOKEN не найден на сервере ${serverTypeDetail}. Убедитесь, что он правильно установлен в переменных окружения Vercel для Deployment, и что сборка была пересоздана/перезапущена после добавления.`,
       };
     }
+    console.log('[Genkit Flow - sendTelegramMessageFlow] TELEGRAM_BOT_TOKEN found.');
 
     const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    console.log(`[Genkit Flow - sendTelegramMessageFlow] Attempting to send to API URL (token hidden): https://api.telegram.org/bot<TOKEN_HIDDEN>/sendMessage`);
 
     try {
       const response = await fetch(apiUrl, {
@@ -62,6 +91,9 @@ const sendTelegramMessageFlow = ai.defineFlow(
       });
 
       const responseData = await response.json();
+      console.log('[Genkit Flow - sendTelegramMessageFlow] Telegram API response status:', response.status);
+      console.log('[Genkit Flow - sendTelegramMessageFlow] Telegram API response data:', JSON.stringify(responseData));
+
 
       if (response.ok && responseData.ok) {
         return {
@@ -70,15 +102,19 @@ const sendTelegramMessageFlow = ai.defineFlow(
           telegramResponse: responseData,
         };
       } else {
-        console.error('Telegram API Error:', responseData);
+        console.error('[Genkit Flow - sendTelegramMessageFlow] Telegram API Error:', responseData);
         const errorDescription = responseData.description || `HTTP status ${response.status}`;
         const errorCode = responseData.error_code ? ` (Код: ${responseData.error_code})` : '';
         let detailedMessage = `Ошибка Telegram API: ${errorDescription}${errorCode}. Проверьте правильность ID чата/имени пользователя и токен бота.`;
 
         if (responseData.error_code === 400 && errorDescription.toLowerCase().includes('chat not found')) {
             detailedMessage += ' Убедитесь, что бот является участником указанного чата (группы/канала) и имеет права на отправку сообщений. Для каналов бот должен быть администратором с правом публикации.';
+        } else if (responseData.error_code === 403 && errorDescription.toLowerCase().includes('bot was blocked by the user')) {
+            detailedMessage += ' Пользователь заблокировал бота, или бот был удален из чата/канала.';
         } else if (responseData.error_code === 403) {
-            detailedMessage += ' Убедитесь, что бот имеет необходимые разрешения для отправки сообщений в этот чат (например, не заблокирован пользователем или имеет права в группе/канале).';
+             detailedMessage += ' Убедитесь, что бот имеет необходимые разрешения для отправки сообщений в этот чат (например, не заблокирован пользователем или имеет права в группе/канале).';
+        } else if (responseData.error_code === 401 && errorDescription.toLowerCase().includes('unauthorized')) {
+            detailedMessage += ' Неверный токен бота. Проверьте значение TELEGRAM_BOT_TOKEN в переменных окружения Vercel.';
         }
 
 
@@ -89,10 +125,11 @@ const sendTelegramMessageFlow = ai.defineFlow(
         };
       }
     } catch (error: any) {
-      console.error('Failed to send Telegram message:', error);
+      console.error('[Genkit Flow - sendTelegramMessageFlow] Network or fetch execution error:', error.message, error.stack);
       return {
         success: false,
-        message: `Сетевая ошибка или ошибка выполнения запроса: ${error.message || 'Неизвестная ошибка при связи с Telegram.'}`,
+        message: `Сетевая ошибка или ошибка выполнения запроса к Telegram: ${error.message || 'Неизвестная ошибка при связи с Telegram.'}`,
+        telegramResponse: { error: error.message, stack: error.stack },
       };
     }
   }
