@@ -1,7 +1,7 @@
 
 "use client";
 
-import * as React from 'react'; // Явный импорт React
+import * as React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { 
@@ -14,10 +14,13 @@ import {
   LogOut,
   Home,
   FilePlus2,
-  Search
+  Search,
+  LogIn,
+  UserPlus,
+  FileText // For "Мои отклики"
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react'; // Импорт типа для иконок
-import { useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -34,28 +37,77 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { auth } from '@/lib/firebase'; // Import auth
+import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
 
 interface NavLink {
   href: string;
   label: string;
-  icon: LucideIcon; // Используем тип LucideIcon
+  icon: LucideIcon;
 }
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
-  const user = {
-    isLoggedIn: false, 
-    // name: "Иван П.",
-    // avatarUrl: "https://placehold.co/40x40.png", 
+  useEffect(() => {
+    if (!auth) {
+      console.warn("Firebase Auth is not initialized. Skipping auth state listener.");
+      setIsLoadingAuth(false);
+      return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsLoadingAuth(false);
+    });
+    return () => unsubscribe(); // Cleanup subscription on unmount
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    if (!auth) {
+      toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
+      return;
+    }
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+      toast({
+        title: "Вход выполнен",
+        description: "Вы успешно вошли через Google.",
+      });
+      setIsMobileMenuOpen(false);
+    } catch (error: any) {
+      console.error("Google Sign-In Error:", error);
+      toast({
+        title: "Ошибка входа",
+        description: error.message || "Не удалось войти через Google. Попробуйте еще раз.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleLogout = () => {
-    toast({
-      title: "Выход",
-      description: "Вы успешно вышли из системы (демонстрация).",
-    });
+  const handleLogout = async () => {
+    if (!auth) {
+      toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
+      return;
+    }
+    try {
+      await signOut(auth);
+      toast({
+        title: "Выход",
+        description: "Вы успешно вышли из системы.",
+      });
+      setIsMobileMenuOpen(false);
+    } catch (error: any) {
+      console.error("Logout Error:", error);
+      toast({
+        title: "Ошибка выхода",
+        description: error.message || "Не удалось выйти. Попробуйте еще раз.",
+        variant: "destructive",
+      });
+    }
   };
 
   const mainNavLinks: NavLink[] = [
@@ -66,9 +118,26 @@ export default function Header() {
   const userMenuLinks: NavLink[] = [
     { href: "/profile", label: "Мой профиль", icon: UserCircle },
     { href: "/my-tasks", label: "Мои задания", icon: ListChecks },
+    { href: "/my-responses", label: "Мои отклики", icon: FileText },
     { href: "/messages", label: "Сообщения", icon: MessageSquare },
     { href: "/notifications", label: "Уведомления", icon: Bell },
   ];
+
+  if (isLoadingAuth) {
+    // Можно показать скелетон или просто ничего не рендерить, пока идет проверка auth
+    return (
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+        <div className="container flex h-16 items-center">
+          <Link href="/" className="mr-auto flex items-center space-x-2">
+            <Briefcase className="h-7 w-7 text-accent" />
+            <span className="font-bold text-lg sm:text-xl">Фриланс Ирбит</span>
+          </Link>
+          {/* Placeholder for auth buttons or user menu while loading */}
+          <div className="h-9 w-24 bg-muted/50 rounded animate-pulse ml-auto"></div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
@@ -89,14 +158,14 @@ export default function Header() {
         </nav>
 
         <div className="hidden md:flex items-center ml-4">
-          {user.isLoggedIn ? (
+          {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.avatarUrl} alt={user.name || "User"} data-ai-hint="user avatar" />
+                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="user avatar" />
                     <AvatarFallback>
-                      {user.name ? user.name.substring(0, 1).toUpperCase() : <UserCircle className="h-6 w-6" />}
+                      {user.displayName ? user.displayName.substring(0, 1).toUpperCase() : <UserCircle className="h-6 w-6" />}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -104,7 +173,8 @@ export default function Header() {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.name || "Пользователь"}</p>
+                    <p className="text-sm font-medium leading-none">{user.displayName || "Пользователь"}</p>
+                    {user.email && <p className="text-xs leading-none text-muted-foreground">{user.email}</p>}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -128,11 +198,11 @@ export default function Header() {
             </DropdownMenu>
           ) : (
             <div className="space-x-1 sm:space-x-2">
-              <Button variant="outline" size="sm" className="hover:border-accent hover:text-accent">
-                Войти
+              <Button variant="outline" size="sm" className="hover:border-accent hover:text-accent" onClick={handleGoogleSignIn}>
+                <LogIn className="mr-2 h-4 w-4" /> Войти
               </Button>
-              <Button variant="default" size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
-                Регистрация
+              <Button variant="default" size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={handleGoogleSignIn}>
+                <UserPlus className="mr-2 h-4 w-4" /> Регистрация
               </Button>
             </div>
           )}
@@ -148,7 +218,7 @@ export default function Header() {
             <SheetContent side="right" className="w-[280px] sm:w-[320px] pt-10 px-4">
               <nav className="flex flex-col space-y-2">
                 <SheetClose asChild>
-                    <Link href="/" className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50">
+                    <Link href="/" className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50" onClick={() => setIsMobileMenuOpen(false)}>
                         <Home className="mr-3 h-6 w-6 text-accent/80" /> Главная
                     </Link>
                 </SheetClose>
@@ -171,7 +241,7 @@ export default function Header() {
 
                 <div className="my-4 border-t border-border"></div>
 
-                {user.isLoggedIn ? (
+                {user ? (
                   <>
                     {userMenuLinks.map((link) => {
                       const IconComponent = link.icon;
@@ -205,18 +275,18 @@ export default function Header() {
                       <Button 
                         variant="outline" 
                         className="w-full text-lg py-5"
-                        onClick={() => { setIsMobileMenuOpen(false); }}
+                        onClick={() => { handleGoogleSignIn(); setIsMobileMenuOpen(false); }}
                       >
-                        Войти
+                         <LogIn className="mr-2 h-5 w-5" /> Войти
                       </Button>
                     </SheetClose>
                     <SheetClose asChild>
                       <Button 
                         variant="default" 
                         className="w-full text-lg py-5 bg-accent text-accent-foreground hover:bg-accent/90"
-                        onClick={() => { setIsMobileMenuOpen(false); }}
+                        onClick={() => { handleGoogleSignIn(); setIsMobileMenuOpen(false); }}
                       >
-                        Регистрация
+                        <UserPlus className="mr-2 h-5 w-5" /> Регистрация
                       </Button>
                     </SheetClose>
                   </>

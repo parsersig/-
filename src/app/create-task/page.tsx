@@ -1,9 +1,11 @@
+
 // src/app/create-task/page.tsx
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import {
   Form,
   FormControl,
@@ -20,12 +22,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { taskSchema, type TaskFormValues, taskCategories, type StoredTask } from "@/lib/schemas";
-import { FileText, DollarSign, ListChecks, UserCircle, Edit3 } from 'lucide-react';
+import { FileText, DollarSign, ListChecks, UserCircle, Edit3, ExternalLink } from 'lucide-react';
+import { auth } from "@/lib/firebase"; // Import auth for userId
+import { useState, useEffect } from "react";
+import type { User } from "firebase/auth";
+
 
 const LOCAL_STORAGE_TASKS_KEY = 'irbit-freelance-tasks';
 
 export default function CreateTaskPage() {
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (auth) {
+      const unsubscribe = auth.onAuthStateChanged(user => {
+        setCurrentUser(user);
+      });
+      return () => unsubscribe();
+    }
+  }, []);
+
+
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
@@ -41,27 +59,38 @@ export default function CreateTaskPage() {
   async function onSubmit(data: TaskFormValues) {
     const newTask: StoredTask = {
       ...data,
-      id: `task-${Date.now().toString()}-${Math.random().toString(36).substring(2, 7)}`, // More unique ID
-      postedDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+      id: `task-${Date.now().toString()}-${Math.random().toString(36).substring(2, 7)}`,
+      postedDate: new Date().toISOString().split('T')[0],
       city: "Ирбит",
       views: 0,
+      userId: currentUser?.uid || undefined, // Add userId if user is logged in
     };
 
     try {
       const existingTasksRaw = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
       const existingTasks: StoredTask[] = existingTasksRaw ? JSON.parse(existingTasksRaw) : [];
-      existingTasks.unshift(newTask); // Add new task to the beginning
+      existingTasks.unshift(newTask); 
       localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(existingTasks));
 
       toast({
-        title: "Задание успешно создано!",
+        title: "Задание опубликовано!",
         description: (
-          <div className="text-sm">
+          <div className="flex flex-col gap-2">
             <p>Ваше задание "{newTask.title}" сохранено локально.</p>
-            <p>Оно будет отображаться на странице просмотра заданий.</p>
+            <div className="flex gap-2 mt-2">
+                <Button variant="outline" size="sm" asChild>
+                    <Link href={`/tasks/${newTask.id}`} className="flex items-center">
+                        <ExternalLink className="h-4 w-4 mr-1.5"/>
+                        Посмотреть задание
+                    </Link>
+                </Button>
+                <Button variant="default" size="sm" asChild>
+                    <Link href="/tasks">Все задания</Link>
+                </Button>
+            </div>
           </div>
         ),
-        variant: "default", // 'default' is usually for success, shadcn might use different variants
+        duration: 7000, // Longer duration for toast with actions
       });
       form.reset(); 
     } catch (error) {
@@ -75,7 +104,7 @@ export default function CreateTaskPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto"> {/* Slightly reduced max-width for better form appearance */}
+    <div className="max-w-2xl mx-auto"> 
       <Card className="shadow-xl bg-card/70 backdrop-blur-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center space-x-3">
@@ -88,7 +117,7 @@ export default function CreateTaskPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-2 sm:pt-4"> {/* Adjusted padding */}
+        <CardContent className="pt-2 sm:pt-4"> 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
               <FormField
@@ -179,7 +208,7 @@ export default function CreateTaskPage() {
                   control={form.control}
                   name="isNegotiable"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 sm:p-4 shadow-sm bg-muted/30 mt-6 md:mt-10"> {/* Adjusted mt */}
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 sm:p-4 shadow-sm bg-muted/30 mt-6 md:mt-10"> 
                       <FormControl>
                         <Checkbox
                           checked={field.value}

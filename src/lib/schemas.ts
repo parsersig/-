@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export const taskCategories = [
@@ -30,9 +31,9 @@ export const taskSchema = z.object({
   }),
   budget: z.preprocess(
     (val) => {
-      if (typeof val === 'string' && val.trim() === '') return undefined; // Treat empty string as undefined for optional
+      if (typeof val === 'string' && val.trim() === '') return undefined; 
       const num = parseFloat(String(val));
-      return isNaN(num) ? val : num; // Keep original if not a number (for further zod validation)
+      return isNaN(num) ? val : num; 
     },
     z.number({ invalid_type_error: "Бюджет должен быть числом." })
       .positive({ message: "Бюджет должен быть положительным числом." })
@@ -52,4 +53,5 @@ export type StoredTask = TaskFormValues & {
   postedDate: string; // YYYY-MM-DD
   city: string;
   views: number;
+  userId?: string; // ID пользователя, создавшего задание (опционально для обратной совместимости)
 };

@@ -22,17 +22,16 @@ let authInstance: Auth | null = null;
 // Initialize Firebase
 if (!getApps().length) {
   if (!firebaseConfig.apiKey) {
-    console.error("Firebase Build/Runtime Error: NEXT_PUBLIC_FIREBASE_API_KEY is not set. Firebase features requiring auth will not work. Please check your environment variables.");
+    console.error("Firebase Build/Runtime Error: NEXT_PUBLIC_FIREBASE_API_KEY is not set. Firebase features requiring auth will not work. Please check your environment variables in .env.local or Vercel settings.");
     // App can be initialized even with missing apiKey, but auth-dependent services will fail.
     // We proceed to initialize app, but auth will remain null.
      try {
-      app = initializeApp(firebaseConfig); // Firebase will throw its own error here if apiKey is truly invalid or malformed for initialization
+      // Attempt to initialize app even if some keys might be missing for build purposes,
+      // runtime will fail later if keys are truly absent for auth.
+      app = initializeApp(firebaseConfig); 
     } catch (e: any) {
       console.error("Firebase Critical Error: Failed to initialize Firebase app, likely due to malformed config or missing API key:", e.message);
       // In this case, app might not be initialized, and authInstance will definitely be null.
-      // This state should be handled gracefully by components using Firebase.
-      // For now, we'll let app potentially be uninitialized if initializeApp itself fails.
-      // A more robust solution might involve a global state to indicate Firebase readiness.
     }
   } else {
     app = initializeApp(firebaseConfig);
@@ -42,7 +41,6 @@ if (!getApps().length) {
 }
 
 // Initialize Auth only if app was successfully initialized and apiKey is present
-// It's possible app is undefined if initializeApp failed above due to critical config error
 if (typeof app !== 'undefined' && firebaseConfig.apiKey) {
   try {
     authInstance = getAuth(app);
@@ -51,9 +49,8 @@ if (typeof app !== 'undefined' && firebaseConfig.apiKey) {
     // authInstance remains null
   }
 } else if (typeof app !== 'undefined' && !firebaseConfig.apiKey) {
-  // This case is already covered by the console.error above,
-  // but good to be explicit that authInstance remains null.
-  // console.warn("Firebase Auth Warning: Auth service cannot be initialized because NEXT_PUBLIC_FIREBASE_API_KEY is missing.");
+  // This case is covered by the console.error during app initialization.
+  // authInstance will be null here.
 }
 
 
