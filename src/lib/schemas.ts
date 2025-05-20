@@ -1,5 +1,6 @@
 
 import { z } from 'zod';
+import type { Timestamp } from 'firebase/firestore';
 
 export const taskCategories = [
   "Ремонт и строительство",
@@ -47,11 +48,28 @@ export const taskSchema = z.object({
 
 export type TaskFormValues = z.infer<typeof taskSchema>;
 
-// Тип для задач, хранящихся в localStorage и отображаемых
+// Тип для задач, хранящихся в Firestore и отображаемых
 export type StoredTask = TaskFormValues & {
   id: string;
-  postedDate: string; // YYYY-MM-DD
+  postedDate: string; // Уже сконвертированная в строку дата
+  firestorePostedDate?: Timestamp; // Оригинальный Timestamp для сортировки, если нужно
   city: string;
   views: number;
-  userId?: string; // ID пользователя, создавшего задание (опционально для обратной совместимости)
+  userId?: string; 
+};
+
+// Схема для отклика на задание
+export const responseSchema = z.object({
+  taskId: z.string(),
+  taskTitle: z.string(),
+  responderId: z.string(),
+  responderName: z.string().nullable().optional(),
+  responderPhotoURL: z.string().url().nullable().optional(),
+  // respondedAt будет добавляться как serverTimestamp() при записи
+});
+
+export type ResponseData = z.infer<typeof responseSchema> & {
+  id: string; // ID документа отклика из Firestore
+  respondedAt: string; // Уже сконвертированная в строку дата
+  firestoreRespondedAt?: Timestamp; // Оригинальный Timestamp 
 };

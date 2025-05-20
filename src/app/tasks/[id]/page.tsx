@@ -8,13 +8,12 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle, Loader2 } from 'lucide-react';
-import type { StoredTask } from '@/lib/schemas'; // Assuming StoredTask might need adjustment for Firestore data
+import type { StoredTask } from '@/lib/schemas';
 import { useToast } from "@/hooks/use-toast";
-import { db, auth } from '@/lib/firebase'; // Import db and auth
-import { doc, getDoc, updateDoc, increment, Timestamp } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { doc, getDoc, updateDoc, increment, Timestamp, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 
-// Helper function to convert Firestore Timestamp to string or return existing string
 const formatDate = (date: any): string => {
   if (!date) return 'Дата не указана';
   if (date instanceof Timestamp) {
@@ -34,9 +33,10 @@ export default function TaskDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
   const taskId = params.id as string;
-  const [task, setTask] = useState<StoredTask | null | undefined>(undefined); // undefined - loading, null - not found
+  const [task, setTask] = useState<StoredTask | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isResponding, setIsResponding] = useState(false);
 
   useEffect(() => {
     if (auth) {
@@ -52,7 +52,6 @@ export default function TaskDetailPage() {
       console.warn("Firestore not initialized, cannot increment view count.");
       return;
     }
-    // Simple session-based view tracking to avoid multiple increments by the same user in a short period
     const viewedTasksKey = 'viewedTasks';
     let viewedTasks: string[] = [];
     try {
@@ -72,15 +71,11 @@ export default function TaskDetailPage() {
         });
         viewedTasks.push(currentTaskId);
         sessionStorage.setItem(viewedTasksKey, JSON.stringify(viewedTasks));
-        console.log("View count incremented for task:", currentTaskId);
       } catch (error) {
         console.error("Error incrementing view count:", error);
       }
-    } else {
-      console.log("Task already viewed in this session:", currentTaskId);
     }
   }, []);
-
 
   useEffect(() => {
     if (taskId && db) {
@@ -92,7 +87,7 @@ export default function TaskDetailPage() {
 
           if (taskSnap.exists()) {
             const taskData = taskSnap.data();
-            const fetchedTask = {
+            const fetchedTask: StoredTask = {
               id: taskSnap.id,
               title: taskData.title,
               description: taskData.description,
@@ -100,15 +95,14 @@ export default function TaskDetailPage() {
               budget: taskData.budget,
               isNegotiable: taskData.isNegotiable,
               contactInfo: taskData.contactInfo,
-              postedDate: formatDate(taskData.postedDate), // Convert Timestamp
+              postedDate: formatDate(taskData.postedDate as Timestamp),
               city: taskData.city,
               views: taskData.views,
               userId: taskData.userId,
             };
-            setTask(fetchedTask as StoredTask);
-            await incrementViewCount(taskId); // Increment views after task is fetched
+            setTask(fetchedTask);
+            await incrementViewCount(taskId);
           } else {
-            console.log("No such document!");
             setTask(null);
           }
         } catch (error) {
@@ -127,7 +121,7 @@ export default function TaskDetailPage() {
     } else if (!db) {
         console.warn("Firestore (db) is not initialized. Cannot fetch task.");
         setIsLoading(false);
-        setTask(null); // Set task to null if db is not available
+        setTask(null);
          toast({
             title: "Ошибка конфигурации",
             description: "База данных не доступна. Проверьте настройки Firebase.",
@@ -136,8 +130,8 @@ export default function TaskDetailPage() {
     }
   }, [taskId, incrementViewCount, toast]);
 
-  const handleRespond = () => {
-    if (!task) return;
+  const handleRespond = async () => {
+    if (!task || !taskId || !db) return;
     if (!currentUser) {
       toast({
         title: "Требуется вход",
@@ -146,13 +140,32 @@ export default function TaskDetailPage() {
       });
       return;
     }
-    // TODO: Implement actual response saving to Firestore in the next step
-    toast({
-      title: "Отклик принят!",
-      description: `Ваш отклик на задание «${task.title}» зарегистрирован. Заказчик получит уведомление, как только система откликов будет полностью интегрирована.`,
-      variant: "default",
-      duration: 7000,
-    });
+    setIsResponding(true);
+    try {
+      await addDoc(collection(db, "responses"), {
+        taskId: taskId,
+        taskTitle: task.title,
+        responderId: currentUser.uid,
+        responderName: currentUser.displayName || "Анонимный исполнитель",
+        responderPhotoURL: currentUser.photoURL || null,
+        respondedAt: serverTimestamp(),
+      });
+      toast({
+        title: "Отклик успешно отправлен!",
+        description: `Ваш отклик на задание «${task.title}» сохранен в базе данных.`,
+        variant: "default",
+        duration: 7000,
+      });
+    } catch (error) {
+      console.error("Error saving response to Firestore:", error);
+      toast({
+        title: "Ошибка отклика",
+        description: `Не удалось сохранить ваш отклик. ${error instanceof Error ? error.message : 'Пожалуйста, попробуйте еще раз.'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsResponding(false);
+    }
   };
 
   if (isLoading) {
@@ -183,6 +196,8 @@ export default function TaskDetailPage() {
       </div>
     );
   }
+  
+  if (!task) return null; // Should not happen if isLoading is false and task is not null
 
   return (
     <div className="max-w-3xl mx-auto px-2 sm:px-0">
@@ -250,9 +265,20 @@ export default function TaskDetailPage() {
         </CardContent>
         <CardFooter className="pt-5 sm:pt-6 px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
            <p className="text-sm text-muted-foreground text-center sm:text-left">Готовы взяться за это задание или есть вопросы?</p>
-          <Button size="lg" className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" onClick={handleRespond} disabled={!currentUser}>
+          <Button 
+            size="lg" 
+            className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" 
+            onClick={handleRespond} 
+            disabled={!currentUser || isResponding || (currentUser && currentUser.uid === task.userId)}
+          >
             <MessageSquare className="mr-2 h-5 w-5" />
-            {currentUser ? "Откликнуться" : "Войдите, чтобы откликнуться"}
+            {isResponding 
+              ? "Отправка отклика..." 
+              : (!currentUser 
+                  ? "Войдите, чтобы откликнуться" 
+                  : (currentUser.uid === task.userId 
+                      ? "Это ваше задание" 
+                      : "Откликнуться"))}
           </Button>
         </CardFooter>
       </Card>

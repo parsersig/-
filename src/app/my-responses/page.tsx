@@ -2,26 +2,79 @@
 // src/app/my-responses/page.tsx
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, LogIn, UserCircle } from "lucide-react";
 import { useState, useEffect } from 'react';
-import { auth } from '@/lib/firebase';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { FileText, LogIn, UserCircle, Briefcase, CalendarDays, ArrowRight } from "lucide-react";
+import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import type { ResponseData } from '@/lib/schemas'; // Убедитесь, что ResponseData импортирован
+
+const formatDate = (date: any): string => {
+  if (!date) return 'Дата не указана';
+  if (date instanceof Timestamp) {
+    return date.toDate().toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  if (typeof date === 'string') {
+    const parsedDate = new Date(date);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+  }
+  return 'Неверный формат даты';
+};
 
 export default function MyResponsesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [userResponses, setUserResponses] = useState<ResponseData[]>([]);
+  const [isLoadingResponses, setIsLoadingResponses] = useState(true);
 
   useEffect(() => {
-    if (!auth) { // Check if Firebase auth is even configured/available
+    if (!auth) {
         setIsLoadingAuth(false);
+        setIsLoadingResponses(false);
         return;
     }
-    const unsubscribe = auth.onAuthStateChanged(currentUser => {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
       setIsLoadingAuth(false);
+      if (currentUser && db) {
+        setIsLoadingResponses(true);
+        try {
+          const responsesQuery = query(
+            collection(db, "responses"), 
+            where("responderId", "==", currentUser.uid),
+            orderBy("respondedAt", "desc")
+          );
+          const querySnapshot = await getDocs(responsesQuery);
+          const responses: ResponseData[] = [];
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            responses.push({
+              id: doc.id,
+              taskId: data.taskId,
+              taskTitle: data.taskTitle,
+              responderId: data.responderId,
+              responderName: data.responderName,
+              responderPhotoURL: data.responderPhotoURL,
+              respondedAt: formatDate(data.respondedAt as Timestamp),
+              firestoreRespondedAt: data.respondedAt as Timestamp, // Store original for potential future use
+            });
+          });
+          setUserResponses(responses);
+        } catch (error) {
+          console.error("Error fetching user responses:", error);
+          // Здесь можно добавить toast с ошибкой
+        } finally {
+          setIsLoadingResponses(false);
+        }
+      } else {
+        setUserResponses([]);
+        setIsLoadingResponses(false);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -58,21 +111,61 @@ export default function MyResponsesPage() {
     );
   }
 
+  if (isLoadingResponses) {
+    return (
+     <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+       <div className="text-center p-4">
+         <FileText className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground animate-pulse" />
+         <p className="mt-4 text-lg sm:text-xl text-muted-foreground">Загрузка ваших откликов...</p>
+       </div>
+     </div>
+   );
+ }
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <Card className="shadow-xl bg-card/70 backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex items-center space-x-3">
-            <FileText className="h-8 w-8 text-accent" />
-            <CardTitle className="text-2xl sm:text-3xl font-bold">Мои отклики</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Здесь будут отображаться ваши отклики на задания других пользователей.</p>
-          <p className="text-muted-foreground mt-2">Эта функциональность находится в разработке.</p>
-          {/* TODO: Implement logic to show user's responses to tasks */}
-        </CardContent>
-      </Card>
+    <div className="max-w-3xl mx-auto">
+      <div className="mb-6 sm:mb-8 text-center sm:text-left">
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl flex items-center justify-center sm:justify-start">
+            <FileText className="h-8 w-8 mr-3 text-accent" />
+            Мои отклики на задания
+        </h1>
+        <p className="mt-2 text-md text-muted-foreground">Здесь отображаются задания, на которые вы откликнулись.</p>
+      </div>
+
+      {userResponses.length > 0 ? (
+        <div className="space-y-4 sm:space-y-6">
+          {userResponses.map((response) => (
+            <Card key={response.id} className="shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/80 backdrop-blur-sm">
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="text-lg sm:text-xl hover:text-accent transition-colors">
+                  <Link href={`/tasks/${response.taskId}`}>{response.taskTitle}</Link>
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm text-muted-foreground flex items-center pt-1">
+                  <CalendarDays className="h-4 w-4 mr-1.5 text-accent/80" /> 
+                  Вы откликнулись: {response.respondedAt}
+                </CardDescription>
+              </CardHeader>
+              {/* Можно добавить CardContent для текста отклика, если он будет */}
+              <CardFooter className="flex justify-end pt-3 sm:pt-4">
+                <Button asChild variant="default" size="sm" className="hover-scale text-sm px-4">
+                  <Link href={`/tasks/${response.taskId}`} className="flex items-center">
+                    Перейти к заданию <ArrowRight className="ml-1.5 h-4 w-4"/>
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card className="shadow-xl bg-card/70 backdrop-blur-sm p-6 sm:p-8 text-center">
+           <FileText className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mb-4" />
+          <h3 className="text-xl sm:text-2xl font-semibold mb-2">У вас пока нет откликов</h3>
+          <p className="text-muted-foreground mb-6">Найдите интересные задания и откликайтесь на них!</p>
+          <Button size="lg" asChild className="hover-scale">
+            <Link href="/tasks">Найти задания</Link>
+          </Button>
+        </Card>
+      )}
     </div>
   );
 }
