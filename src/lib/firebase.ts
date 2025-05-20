@@ -1,7 +1,8 @@
 
 // src/lib/firebase.ts
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth"; // Removed connectAuthEmulator as it's not currently used
+import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore"; // Ensure getFirestore is imported
 
 // Your web app's Firebase configuration
 // IMPORTANT: These values MUST be set in your .env.local file for local development
@@ -13,52 +14,40 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Optional, but good to have if configured
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID, // Optional
 };
 
-let app: FirebaseApp | undefined = undefined; // Initialize as undefined
+let app: FirebaseApp | undefined = undefined;
 let authInstance: Auth | null = null;
+let dbInstance: Firestore | null = null; // Declare dbInstance
 
-// Initialize Firebase only if not already initialized and apiKey is present
+// Initialize Firebase only if not already initialized and essential keys are present
 if (!getApps().length) {
-  if (firebaseConfig.apiKey && firebaseConfig.projectId) { // Check for essential keys
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     try {
       app = initializeApp(firebaseConfig);
       authInstance = getAuth(app);
+      dbInstance = getFirestore(app); // Initialize Firestore
     } catch (e: any) {
       console.error("Firebase Critical Error: Failed to initialize Firebase app. Check your Firebase config values:", e.message);
-      // app remains undefined, authInstance remains null
+      // app remains undefined, authInstance and dbInstance remain null
     }
   } else {
-    // Output error only in development if keys are missing, to avoid breaking Vercel build if intentionally disabled
     if (process.env.NODE_ENV === 'development') {
-      console.error("Firebase Config Error: NEXT_PUBLIC_FIREBASE_API_KEY or NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set. Firebase features will be unavailable. Please check your .env.local file.");
+      console.warn("Firebase Config Warning: NEXT_PUBLIC_FIREBASE_API_KEY or NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set. Firebase features will be unavailable. Please check your .env.local file.");
     }
-    // To allow the app to build/run without Firebase for other features, we don't throw an error here
-    // but authInstance will remain null. Components using auth must handle this.
   }
 } else {
   app = getApps()[0];
-  // If app was initialized by getApps(), try to get auth if apiKey is present
+  // If app was initialized by getApps(), try to get auth and db if essential keys are present
   if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     try {
         authInstance = getAuth(app);
+        dbInstance = getFirestore(app); // Initialize Firestore
     } catch (e:any) {
-        console.error("Firebase Auth Error: Failed to getAuth instance on re-initialized app.", e.message);
+        console.error("Firebase Services Error: Failed to get Auth or Firestore instance on re-initialized app.", e.message);
     }
   }
 }
 
-// Emulators are commented out
-// if (process.env.NODE_ENV === 'development') {
-//   if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true' && authInstance) {
-//     try {
-//       console.log("Firebase: Connecting to Auth Emulator (localhost:9099)");
-//       connectAuthEmulator(authInstance, "http://localhost:9099", { disableWarnings: true });
-//     } catch (error) {
-//         console.error("Firebase: Error connecting to Auth Emulator", error);
-//     }
-//   }
-// }
-
-export { app, authInstance as auth };
+export { app, authInstance as auth, dbInstance as db }; // Export app, auth, and db
