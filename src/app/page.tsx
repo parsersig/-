@@ -62,7 +62,7 @@ export default function AutoMessengerPage() {
             setTotalSentSuccess(prev => prev + 1);
             toast({
               title: "Сообщение отправлено",
-              description: `Сообщение для "${currentConfig.targetBotUsername}" успешно отправлено в ${currentTime}.`,
+              description: `Сообщение для "${currentConfig.targetBotUsername}" успешно отправлено в ${currentTime}. Подробности от Telegram: ${JSON.stringify(result.telegramResponse?.result?.chat) || 'нет деталей чата'}`,
             });
           } else {
             const errorMsg = result.message || "Не удалось отправить сообщение. Проверьте данные или попробуйте позже.";
@@ -171,12 +171,12 @@ export default function AutoMessengerPage() {
                 name="targetBotUsername"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base">ID чата / Имя пользователя (напр. @channel или 123456789)</FormLabel>
+                    <FormLabel className="text-base">ID чата / @username (пользователя, группы, канала). Если цель - другой бот, укажите ID группы, где оба бота участники.</FormLabel>
                     <FormControl>
                       <div className="relative flex items-center">
                         <MessageCircle className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                         <Input 
-                          placeholder="@channel или ID чата" {...field} 
+                          placeholder="@channel, ID чата или ID группы" {...field} 
                           className="pl-10 text-base h-12 rounded-lg" 
                           disabled={isRunning && !isSending}
                         />
