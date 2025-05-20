@@ -6,7 +6,6 @@ import { NextResponse as Res } from 'next/server';
 interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
-  // Можно добавить другие типы обновлений: edited_message, channel_post и т.д.
 }
 
 interface TelegramMessage {
@@ -15,7 +14,6 @@ interface TelegramMessage {
   chat: TelegramChat;
   date: number;
   text?: string;
-  // Можно добавить другие поля сообщения: photo, audio и т.д.
 }
 
 interface TelegramUser {
@@ -35,15 +33,9 @@ interface TelegramChat {
   last_name?: string;
 }
 
-/**
- * Отправляет ответное сообщение в Telegram.
- * @param chatId ID чата, куда отправить ответ.
- * @param text Текст ответного сообщения.
- * @param botToken Токен вашего бота.
- * @returns true в случае успеха, иначе false.
- */
 async function sendTelegramReply(chatId: number, text: string, botToken: string): Promise<boolean> {
   const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+  console.log(`[Webhook] Attempting to send reply to chat ID ${chatId} with text: "${text.substring(0, 30)}..."`);
   try {
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -57,64 +49,70 @@ async function sendTelegramReply(chatId: number, text: string, botToken: string)
     });
     const responseData = await response.json();
     if (!response.ok || !responseData.ok) {
-        console.error('Telegram API error while sending reply:', responseData);
+        console.error('[Webhook] Telegram API error while sending reply:', JSON.stringify(responseData));
         return false;
     }
+    console.log('[Webhook] Successfully sent reply to Telegram.');
     return true;
-  } catch (error) {
-    console.error('Failed to send Telegram reply:', error);
+  } catch (error: any) {
+    console.error('[Webhook] Failed to send Telegram reply due to fetch/network error:', error.message);
     return false;
   }
 }
 
-// Обработчик POST-запросов для вебхука
 export async function POST(req: NextRequest) {
+  console.log('[Webhook] Received POST request.');
+
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!botToken) {
-    console.error('TELEGRAM_BOT_TOKEN is not set in environment variables for webhook.');
-    // Важно не отправлять подробные сообщения об ошибках обратно в Telegram,
-    // если это не специальный ожидаемый ими формат.
-    return Res.json({ error: 'Configuration error on server' }, { status: 500 });
+    console.error('[Webhook CRITICAL] TELEGRAM_BOT_TOKEN is not set or not accessible in environment variables for the webhook function on Vercel.');
+    // Telegram ожидает ответ 200 OK, даже если есть внутренняя ошибка, чтобы не повторять запросы.
+    // В реальном приложении можно логировать эту ошибку для мониторинга.
+    return Res.json({ error: 'Server configuration error: Bot token missing.' }, { status: 200 });
   }
+  console.log(`[Webhook] TELEGRAM_BOT_TOKEN found (starts with: ${botToken.substring(0, botToken.indexOf(':'))}:...).`);
 
   try {
     const update = (await req.json()) as TelegramUpdate;
-    // console.log('Received update from Telegram:', JSON.stringify(update, null, 2)); // Для отладки
+    // console.log('[Webhook] Received update from Telegram:', JSON.stringify(update, null, 2));
 
     if (update.message && update.message.text) {
       const chatId = update.message.chat.id;
-      const messageText = update.message.text.trim().toLowerCase(); // Приводим к нижнему регистру для надежности
+      const messageText = update.message.text.trim().toLowerCase();
+      const senderUsername = update.message.from?.username || 'unknown_user';
+
+      console.log(`[Webhook] Processing message from chat ID ${chatId} (user: @${senderUsername}): "${messageText}"`);
 
       if (messageText === '/start') {
-        const replyText = 'Привет! Вы написали /start. Это тестовый ответ от вашего бота, настроенного через Next.js!';
+        const replyText = 'Привет! Это упрощенный тестовый ответ на /start от вашего бота на Vercel!';
         const success = await sendTelegramReply(chatId, replyText, botToken);
         if (success) {
-          console.log(`Successfully replied to /start from chat ID ${chatId}`);
+          console.log(`[Webhook] Successfully replied to /start from chat ID ${chatId}`);
         } else {
-          console.error(`Failed to reply to /start for chat ID ${chatId}`);
+          console.error(`[Webhook] Failed to send /start reply for chat ID ${chatId}, but webhook will return 200 OK.`);
         }
+      } else {
+        console.log(`[Webhook] Received message that is not /start: "${messageText}". No action taken.`);
       }
-      // Здесь можно добавить обработку других команд, например:
-      // else if (messageText === '/help') {
-      //   const replyText = 'Это команда /help...';
-      //   await sendTelegramReply(chatId, replyText, botToken);
-      // }
+    } else {
+      console.log('[Webhook] Received update without a message or text field. No action taken.');
     }
 
     // Telegram ожидает ответ 200 OK для подтверждения получения обновления.
-    // Если не отправить, Telegram будет повторять попытки.
     return Res.json({ status: 'ok' }, { status: 200 });
 
-  } catch (error) {
-    console.error('Error processing Telegram update:', error);
-    // Для ошибок парсинга или других проблем с запросом
-    return Res.json({ error: 'Error processing update' }, { status: 400 });
+  } catch (error: any) {
+    console.error('[Webhook] Error processing Telegram update JSON or other unexpected error:', error.message, error.stack);
+    return Res.json({ error: 'Error processing update on server' }, { status: 200 }); // Все равно отвечаем 200
   }
 }
 
-// GET-обработчик можно использовать для первоначальной установки вебхука (некоторые сервисы это требуют)
-// или просто для проверки, что URL доступен.
 export async function GET(req: NextRequest) {
-  return Res.json({ message: 'Telegram Webhook is active. Use POST method for updates.' });
+  console.log('[Webhook] Received GET request.');
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return Res.json({ message: 'Telegram Webhook is active, but TELEGRAM_BOT_TOKEN is MISSING on the server. Please configure it in Vercel environment variables.', status: 'error' });
+  }
+  return Res.json({ message: 'Telegram Webhook is active and TELEGRAM_BOT_TOKEN seems to be present. Use POST method for updates.', status: 'ok' });
 }
