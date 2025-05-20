@@ -118,10 +118,12 @@ export default function TaskDetailPage() {
   }, [taskId]);
 
   const handleRespond = () => {
+    if (!task) return;
     toast({
-      title: "Отклик отправлен (демо)",
-      description: "Ваш отклик на задание успешно зарегистрирован (это демонстрационное сообщение).",
+      title: "Отклик зарегистрирован",
+      description: `Ваш отклик на задание «${task.title}» был успешно зарегистрирован. Заказчик будет уведомлен (демонстрационная функция).`,
       variant: "default",
+      duration: 6000,
     });
   };
 

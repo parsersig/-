@@ -1,4 +1,3 @@
-
 // src/app/create-task/page.tsx
 "use client";
 
@@ -23,7 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { taskSchema, type TaskFormValues, taskCategories, type StoredTask } from "@/lib/schemas";
 import { FileText, DollarSign, ListChecks, UserCircle, Edit3, ExternalLink } from 'lucide-react';
-import { auth } from "@/lib/firebase"; // Import auth for userId
+import { auth } from "@/lib/firebase"; 
 import { useState, useEffect } from "react";
 import type { User } from "firebase/auth";
 
@@ -35,7 +34,7 @@ export default function CreateTaskPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (auth) { // Check if auth service is available
+    if (auth) { 
       const unsubscribe = auth.onAuthStateChanged(user => {
         setCurrentUser(user);
       });
@@ -57,7 +56,7 @@ export default function CreateTaskPage() {
   });
 
   async function onSubmit(data: TaskFormValues) {
-    if (!currentUser && auth) { // Added auth check here
+    if (!currentUser && auth) { 
         toast({
             title: "Требуется вход",
             description: "Пожалуйста, войдите в систему, чтобы опубликовать задание.",
@@ -65,8 +64,6 @@ export default function CreateTaskPage() {
         });
         return;
     }
-    // If auth is null (not configured), allow posting without userId
-    // Or if auth is configured and user is logged in.
     const userId = auth ? currentUser?.uid : undefined;
 
 
@@ -86,10 +83,10 @@ export default function CreateTaskPage() {
       localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(existingTasks));
 
       toast({
-        title: "Задание опубликовано!",
+        title: "Задание успешно опубликовано!",
         description: (
           <div className="flex flex-col gap-2">
-            <p>Ваше задание "{newTask.title}" сохранено локально.</p>
+            <p>Ваше задание «{newTask.title}» сохранено локально и теперь доступно для просмотра.</p>
              {currentUser && <p className="text-xs text-muted-foreground">Оно будет видно в разделе "Мои задания".</p>}
             <div className="flex gap-2 mt-2">
                 <Button variant="outline" size="sm" asChild>
@@ -104,7 +101,7 @@ export default function CreateTaskPage() {
             </div>
           </div>
         ),
-        duration: 7000, 
+        duration: 8000, 
       });
       form.reset(); 
     } catch (error) {
