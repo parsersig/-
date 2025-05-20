@@ -88,7 +88,7 @@ export default function TasksPage() {
   return (
     <div className="space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Актуальные задания в Ирбите</h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Актуальные задания на Фриланс Ирбит</h1>
         <p className="mt-3 text-lg text-muted-foreground">
           Найдите подходящую работу или исполнителя для ваших задач.
         </p>
@@ -136,24 +136,24 @@ export default function TasksPage() {
       {filteredTasks.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredTasks.map((task) => (
-            <Card key={task.id} className="flex flex-col shadow-lg hover:shadow-primary/30 transition-shadow duration-300 hover-lift">
+            <Card key={task.id} className="flex flex-col shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift">
               <CardHeader>
-                <CardTitle className="text-xl hover:text-primary transition-colors">
+                <CardTitle className="text-xl hover:text-accent transition-colors">
                   <Link href={`/tasks/${task.id}`}>{task.title}</Link>
                 </CardTitle>
                 <CardDescription className="text-sm text-muted-foreground flex items-center pt-1">
-                  <Briefcase className="h-4 w-4 mr-1.5" /> {task.category}
+                  <Briefcase className="h-4 w-4 mr-1.5 text-accent/80" /> {task.category}
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex-grow">
                 <p className="text-sm text-muted-foreground line-clamp-3">{task.description}</p>
                  <div className="mt-3 text-sm text-muted-foreground flex items-center">
-                    <MapPin className="h-4 w-4 mr-1.5 text-primary/70" /> {task.city}
+                    <MapPin className="h-4 w-4 mr-1.5 text-accent/70" /> {task.city}
                   </div>
               </CardContent>
               <CardFooter className="flex justify-between items-center border-t pt-4">
                 <div className="flex items-center">
-                   <DollarSign className="h-5 w-5 text-green-500 mr-1.5" />
+                   <DollarSign className="h-5 w-5 text-accent mr-1.5" />
                   <span className="text-lg font-semibold text-foreground">
                     {task.budget ? `${task.budget.toLocaleString()} ₽` : 'Договорная'}
                   </span>

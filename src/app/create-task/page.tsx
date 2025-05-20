@@ -54,7 +54,7 @@ export default function CreateTaskPage() {
       <Card className="shadow-xl bg-card/70 backdrop-blur-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center space-x-3">
-            <Edit3 className="h-8 w-8 text-primary" />
+            <Edit3 className="h-8 w-8 text-accent" />
             <div>
               <CardTitle className="text-3xl font-bold">Создать новое задание</CardTitle>
               <CardDescription className="text-md text-muted-foreground pt-1">
@@ -71,7 +71,7 @@ export default function CreateTaskPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg flex items-center"><FileText className="h-5 w-5 mr-2 text-primary/80"/>Название задания</FormLabel>
+                    <FormLabel className="text-lg flex items-center"><FileText className="h-5 w-5 mr-2 text-accent/80"/>Название задания</FormLabel>
                     <FormControl>
                       <Input placeholder="Например, 'Нужен ремонт стиральной машины'" {...field} className="h-12 text-base" />
                     </FormControl>
@@ -109,7 +109,7 @@ export default function CreateTaskPage() {
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg flex items-center"><ListChecks className="h-5 w-5 mr-2 text-primary/80"/>Категория задания</FormLabel>
+                    <FormLabel className="text-lg flex items-center"><ListChecks className="h-5 w-5 mr-2 text-accent/80"/>Категория задания</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger className="h-12 text-base">
@@ -135,7 +135,7 @@ export default function CreateTaskPage() {
                   name="budget"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-lg flex items-center"><DollarSign className="h-5 w-5 mr-2 text-primary/80"/>Бюджет (₽)</FormLabel>
+                      <FormLabel className="text-lg flex items-center"><DollarSign className="h-5 w-5 mr-2 text-accent/80"/>Бюджет (₽)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -184,7 +184,7 @@ export default function CreateTaskPage() {
                 name="contactInfo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg flex items-center"><UserCircle className="h-5 w-5 mr-2 text-primary/80"/>Контактная информация</FormLabel>
+                    <FormLabel className="text-lg flex items-center"><UserCircle className="h-5 w-5 mr-2 text-accent/80"/>Контактная информация</FormLabel>
                     <FormControl>
                       <Input placeholder="Ваш телефон, Telegram или другой способ связи" {...field} className="h-12 text-base" />
                     </FormControl>
