@@ -4,8 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Briefcase, Users, Search, FileText, CheckCircle, ArrowRight } from 'lucide-react';
-import Image from 'next/image';
+import { Briefcase, Users, Search, FileText, CheckCircle, ArrowRight, TrendingUp, UsersRound, MapPin } from 'lucide-react';
 
 export default function HomePage() {
   const features = [
@@ -42,39 +41,55 @@ export default function HomePage() {
     "Фото и видеосъемка",
   ];
 
+  const stats = [
+    {
+      icon: <TrendingUp className="h-8 w-8 text-accent mb-2" />,
+      value: "150+",
+      label: "Активных заданий",
+    },
+    {
+      icon: <UsersRound className="h-8 w-8 text-accent mb-2" />,
+      value: "300+",
+      label: "Пользователей в Ирбите",
+    },
+    {
+      icon: <MapPin className="h-8 w-8 text-accent mb-2" />,
+      value: "100%",
+      label: "Фокус на нашем городе",
+    },
+  ];
+
   return (
     <div className="flex flex-col items-center">
-      <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-gradient-to-r from-accent/10 via-background to-background">
+      <section className="w-full py-20 md:py-28 lg:py-36 bg-gradient-to-b from-background via-accent/5 to-background text-center">
         <div className="container px-4 md:px-6">
-          <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
-            <div className="flex flex-col justify-center space-y-4">
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                  <Briefcase className="inline-block h-10 w-10 mr-2 text-accent" />
-                  Фриланс Ирбит
-                </h1>
-                <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                  Ваша новая фриланс-площадка для поиска исполнителей и размещения заданий в городе Ирбит.
-                  Быстро, удобно, локально.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                <Button asChild size="lg" className="shadow-lg hover-scale">
-                  <Link href="/tasks">Смотреть задания</Link>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="shadow-lg hover-scale hover:border-accent hover:text-accent">
-                  <Link href="/create-task">Разместить задание</Link>
-                </Button>
-              </div>
+          <div className="flex flex-col items-center space-y-6">
+            <Briefcase className="h-16 w-16 sm:h-20 sm:w-20 text-accent" />
+            <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none">
+              Фриланс Ирбит
+            </h1>
+            <p className="max-w-[700px] text-muted-foreground md:text-xl lg:text-lg xl:text-xl">
+              Ваша новая фриланс-площадка для поиска исполнителей и размещения заданий в городе Ирбит.
+              Быстро, удобно и всегда под рукой для местных нужд.
+            </p>
+            <div className="flex flex-col gap-3 min-[400px]:flex-row">
+              <Button asChild size="lg" className="shadow-lg hover-scale text-lg px-8 py-6">
+                <Link href="/tasks">Смотреть задания</Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="shadow-lg hover-scale hover:border-accent hover:text-accent text-lg px-8 py-6">
+                <Link href="/create-task">Разместить задание</Link>
+              </Button>
             </div>
-            <Image
-              src="https://placehold.co/600x400.png"
-              alt="Иллюстрация фриланс-сервиса"
-              width={600}
-              height={400}
-              className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square shadow-xl"
-              data-ai-hint="freelance community marketplace"
-            />
+            
+            <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl w-full">
+              {stats.map((stat, index) => (
+                <div key={index} className="p-6 bg-card/60 backdrop-blur-sm rounded-xl shadow-lg text-center hover-lift transition-all duration-300 hover:shadow-accent/20">
+                  {stat.icon}
+                  <div className="text-3xl font-bold text-accent">{stat.value}</div>
+                  <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -159,5 +174,4 @@ export default function HomePage() {
     </div>
   );
 }
-
     
