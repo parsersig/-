@@ -19,8 +19,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { taskSchema, type TaskFormValues, taskCategories } from "@/lib/schemas";
+import { taskSchema, type TaskFormValues, taskCategories, type StoredTask } from "@/lib/schemas";
 import { FileText, DollarSign, ListChecks, UserCircle, Edit3 } from 'lucide-react';
+
+const LOCAL_STORAGE_TASKS_KEY = 'irbit-freelance-tasks';
 
 export default function CreateTaskPage() {
   const { toast } = useToast();
@@ -37,16 +39,39 @@ export default function CreateTaskPage() {
   });
 
   async function onSubmit(data: TaskFormValues) {
-    console.log("Task data:", data);
-    toast({
-      title: "Задание создано (демо)",
-      description: (
-        <pre className="mt-2 w-full max-w-[340px] rounded-md bg-slate-800 p-4 overflow-x-auto">
-          <code className="text-white">{JSON.stringify(data, null, 2)}</code>
-        </pre>
-      ),
-    });
-    form.reset(); 
+    const newTask: StoredTask = {
+      ...data,
+      id: `task-${Date.now().toString()}`, // Unique ID
+      postedDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+      city: "Ирбит",
+      views: 0,
+    };
+
+    try {
+      const existingTasksRaw = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
+      const existingTasks: StoredTask[] = existingTasksRaw ? JSON.parse(existingTasksRaw) : [];
+      existingTasks.unshift(newTask); // Add new task to the beginning
+      localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(existingTasks));
+
+      toast({
+        title: "Задание успешно создано!",
+        description: (
+          <div>
+            <p>Ваше задание "{newTask.title}" сохранено локально.</p>
+            <p>Оно будет отображаться на странице просмотра заданий в вашем браузере.</p>
+          </div>
+        ),
+        variant: "default",
+      });
+      form.reset(); 
+    } catch (error) {
+      console.error("Failed to save task to localStorage", error);
+      toast({
+        title: "Ошибка сохранения",
+        description: "Не удалось сохранить задание локально. Пожалуйста, попробуйте еще раз.",
+        variant: "destructive",
+      });
+    }
   }
 
   return (

@@ -42,7 +42,14 @@ export const taskSchema = z.object({
   contactInfo: z.string()
     .min(5, { message: "Укажите контактную информацию (например, телефон или Telegram)." })
     .max(150, { message: "Контактная информация не должна превышать 150 символов." }),
-  // city: z.literal("Ирбит").default("Ирбит"), // Implicitly Irbit
 });
 
 export type TaskFormValues = z.infer<typeof taskSchema>;
+
+// Тип для задач, хранящихся в localStorage и отображаемых
+export type StoredTask = TaskFormValues & {
+  id: string;
+  postedDate: string; // YYYY-MM-DD
+  city: string;
+  views: number;
+};
