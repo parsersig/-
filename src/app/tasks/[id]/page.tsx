@@ -1,31 +1,31 @@
-
 // src/app/tasks/[id]/page.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle } from 'lucide-react';
-import type { StoredTask, ResponseData } from '@/lib/schemas';
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle } from "lucide-react";
+import type { StoredTask, ResponseData } from "@/lib/schemas";
 import { useToast } from "@/hooks/use-toast";
-import { db, auth } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, Timestamp, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import type { User } from 'firebase/auth';
+import { db, auth } from "@/lib/firebase";
+import { doc, getDoc, updateDoc, increment, Timestamp, collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import type { User } from "firebase/auth";
 
 const formatDate = (date: any): string => {
-  if (!date) return 'Дата не указана';
+  if (!date) return "Дата не указана";
   if (date instanceof Timestamp) {
-    return date.toDate().toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toDate().toLocaleDateString("ru-RU", { year: "numeric", month: "long", day: "numeric" });
   }
-  if (typeof date === 'string') {
+  if (typeof date === "string") {
     const parsedDate = new Date(date);
     if (!isNaN(parsedDate.getTime())) {
-      return parsedDate.toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' });
+      return parsedDate.toLocaleDateString("ru-RU", { year: "numeric", month: "long", day: "numeric" });
     }
   }
-  return 'Неверный формат даты';
+  return "Неверный формат даты";
 };
 
 export default function TaskDetailPage() {
@@ -41,7 +41,7 @@ export default function TaskDetailPage() {
 
   useEffect(() => {
     if (auth) {
-      const unsubscribe = auth.onAuthStateChanged(user => {
+      const unsubscribe = auth.onAuthStateChanged((user) => {
         setCurrentUser(user);
       });
       return () => unsubscribe();
@@ -58,12 +58,11 @@ export default function TaskDetailPage() {
       try {
         const taskRef = doc(db, "tasks", currentTaskId);
         await updateDoc(taskRef, {
-          views: increment(1)
+          views: increment(1),
         });
-        sessionStorage.setItem(viewedTasksKey, 'true');
+        sessionStorage.setItem(viewedTasksKey, "true");
         console.log("View count incremented for task:", currentTaskId);
-        // Optimistically update task state or re-fetch for immediate UI update
-        setTask(prev => prev ? ({ ...prev, views: (prev.views || 0) + 1 }) : null);
+        setTask((prev) => (prev ? { ...prev, views: (prev.views || 0) + 1 } : null));
       } catch (error) {
         console.error("Error incrementing view count:", error);
       }
@@ -78,7 +77,7 @@ export default function TaskDetailPage() {
       const fetchTask = async () => {
         try {
           console.log(`Fetching task with ID: ${taskId}`);
-          const taskRef = doc(db, "tasks", taskId);
+          const taskRef = doc(db!, "tasks", taskId);
           const taskSnap = await getDoc(taskRef);
 
           if (taskSnap.exists()) {
@@ -100,7 +99,7 @@ export default function TaskDetailPage() {
           toast({
             title: "Ошибка загрузки",
             description: "Не удалось загрузить детали задания. Попробуйте позже.",
-            variant: "destructive"
+            variant: "destructive",
           });
         } finally {
           setIsLoading(false);
@@ -114,7 +113,7 @@ export default function TaskDetailPage() {
       toast({
         title: "Ошибка конфигурации",
         description: "База данных не доступна. Проверьте настройки Firebase.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   }, [taskId, incrementViewCount, toast]);
@@ -122,7 +121,7 @@ export default function TaskDetailPage() {
   useEffect(() => {
     if (currentUser && task && db) {
       const checkResponseStatus = async () => {
-        const responsesRef = collection(db, "responses");
+        const responsesRef = collection(db!, "responses");
         const q = query(responsesRef, where("taskId", "==", task.id), where("responderId", "==", currentUser.uid));
         const querySnapshot = await getDocs(q);
         setHasResponded(!querySnapshot.empty);
@@ -150,7 +149,7 @@ export default function TaskDetailPage() {
       });
       return;
     }
-    
+
     if (hasResponded) {
       toast({
         title: "Вы уже откликались",
@@ -163,7 +162,7 @@ export default function TaskDetailPage() {
     setIsResponding(true);
     try {
       console.log("Attempting to save response to Firestore. Task:", task, "User:", currentUser);
-      const responseData: Omit<ResponseData, 'id' | 'respondedAt' | 'firestoreRespondedAt'> = {
+      const responseData: Omit<ResponseData, "id" | "respondedAt" | "firestoreRespondedAt"> = {
         taskId: task.id,
         taskTitle: task.title,
         taskCategory: task.category,
@@ -173,23 +172,23 @@ export default function TaskDetailPage() {
         responderPhotoURL: currentUser.photoURL || null,
       };
 
-      await addDoc(collection(db, "responses"), {
+      await addDoc(collection(db!, "responses"), {
         ...responseData,
         respondedAt: serverTimestamp(),
       });
 
       toast({
         title: "Отлично!",
-        description: `Ваш отклик на задание «${task.title}» успешно отправлен и сохранен в базе данных!`,
+        description: `Ваш отклик на задание "${task.title}" успешно отправлен и сохранен в базе данных!`,
         variant: "default",
         duration: 7000,
       });
-      setHasResponded(true); // Обновляем статус, что пользователь откликнулся
+      setHasResponded(true);
     } catch (error) {
       console.error("Failed to save response to Firestore", error);
       toast({
         title: "Ошибка сохранения отклика",
-        description: `Не удалось сохранить ваш отклик. ${error instanceof Error ? error.message : 'Пожалуйста, попробуйте еще раз.'}`,
+        description: `Не удалось сохранить ваш отклик. ${error instanceof Error ? error.message : "Пожалуйста, попробуйте еще раз."}`,
         variant: "destructive",
       });
     } finally {
@@ -226,6 +225,10 @@ export default function TaskDetailPage() {
     );
   }
 
+  if (!task) {
+    return null;
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-2 sm:px-0">
       <Button variant="outline" onClick={() => router.back()} className="mb-4 sm:mb-6 hover-scale hover:border-accent hover:text-accent text-sm sm:text-base">
@@ -239,17 +242,16 @@ export default function TaskDetailPage() {
             <div className="flex-1">
               <CardTitle className="text-2xl sm:text-3xl font-bold leading-tight">{task.title}</CardTitle>
               <CardDescription className="text-sm sm:text-md text-muted-foreground pt-2 flex items-center">
-                <Briefcase className="h-5 w-5 mr-2 text-accent" /> {task.category}
+                <Briefcase className="h-5 w-5 mr-2 text-accent" />
+                {task.category}
               </CardDescription>
             </div>
             <div className="mt-2 md:mt-0 md:text-right shrink-0">
               <div className="flex items-center text-lg sm:text-xl font-semibold text-accent">
                 <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5" />
-                {task.budget ? `${task.budget.toLocaleString()} ₽` : (task.isNegotiable ? 'Цена договорная' : 'Бюджет не указан')}
+                {task.budget ? `${task.budget.toLocaleString()} ₽` : task.isNegotiable ? "Цена договорная" : "Бюджет не указан"}
               </div>
-              {task.isNegotiable && task.budget && (
-                <p className="text-xs text-muted-foreground">(также возможен торг)</p>
-              )}
+              {task.isNegotiable && task.budget && <p className="text-xs text-muted-foreground">(также возможен торг)</p>}
             </div>
           </div>
         </CardHeader>
@@ -303,10 +305,15 @@ export default function TaskDetailPage() {
             ) : (
               <MessageSquare className="mr-2 h-5 w-5" />
             )}
-            {currentUser ? 
-              (task.userId === currentUser.uid ? "Это ваше задание" : (hasResponded ? "Вы уже откликнулись" : (isResponding ? "Отправка..." : "Откликнуться")))
-              : "Войдите, чтобы откликнуться"
-            }
+            {currentUser
+              ? task.userId === currentUser.uid
+                ? "Это ваше задание"
+                : hasResponded
+                ? "Вы уже откликнулись"
+                : isResponding
+                ? "Отправка..."
+                : "Откликнуться"
+              : "Войдите, чтобы откликнуться"}
           </Button>
         </CardFooter>
       </Card>
