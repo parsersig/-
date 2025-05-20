@@ -1,9 +1,14 @@
-// import type { Metadata } from 'next'; // Metadata удалена для теста
+import type { Metadata } from 'next';
+// import { GeistSans } from 'geist/font/sans'; // Keep commented for now
+// import { GeistMono } from 'geist/font/mono'; // Keep commented for now
+import './globals.css';
+import Header from '@/components/layout/header'; // Restore Header import
+import { Toaster } from '@/components/ui/toaster'; // Restore Toaster import
 
-// export const metadata: Metadata = { // Metadata удалена для теста
-//   title: 'Фриланс Ирбит - Найди исполнителя или работу в Ирбите',
-//   description: 'Платформа для заказчиков и исполнителей в городе Ирбит. Фриланс Ирбит - размещайте и находите задания легко!',
-// };
+export const metadata: Metadata = { // Restore metadata
+  title: 'Фриланс Ирбит - Найди исполнителя или работу в Ирбите',
+  description: 'Платформа для заказчиков и исполнителей в городе Ирбит. Фриланс Ирбит - размещайте и находите задания легко!',
+};
 
 export default function RootLayout({
   children,
@@ -12,18 +17,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
-      {/* Все классы удалены */}
-      <body>
-        {/* Header и Toaster закомментированы */}
-        {/* <Header /> */}
-        {/* <main className="flex-grow container mx-auto px-4 py-8"> */}
-        <main> {/* Классы удалены для теста */}
+      {/* <body className={`${GeistSans.variable} ${GeistMono.variable} antialiased flex flex-col min-h-screen`}> */}
+      <body className="antialiased flex flex-col min-h-screen bg-background text-foreground"> {/* Restore basic body classes */}
+        <Header /> {/* Restore Header usage */}
+        <main className="flex-grow container mx-auto px-4 py-8"> {/* Restore main classes */}
           {children}
         </main>
-        {/* <Toaster /> */}
-        {/* Футер максимально упрощен и стилизован инлайн */}
-        <footer style={{ textAlign: 'center', padding: '20px', borderTop: '1px solid #cccccc', fontSize: '12px', marginTop: '30px' }}>
-          © 2024 Фриланс Ирбит. Все права защищены. (Ультра-минимальный тест)
+        <Toaster /> {/* Restore Toaster usage */}
+        <footer className="py-6 text-center text-sm text-muted-foreground border-t"> {/* Restore original footer */}
+          © {new Date().getFullYear()} Фриланс Ирбит. Все права защищены.
         </footer>
       </body>
     </html>
