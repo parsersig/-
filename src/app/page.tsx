@@ -1,9 +1,10 @@
+
 "use client";
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Briefcase, Users, Search, FileText, CheckCircle } from 'lucide-react';
+import { Briefcase, Users, Search, FileText, CheckCircle, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 
 export default function HomePage() {
@@ -37,6 +38,8 @@ export default function HomePage() {
     "Компьютерная помощь",
     "Репетиторство и обучение",
     "Красота и здоровье",
+    "Мероприятия и промоакции",
+    "Фото и видеосъемка",
   ];
 
   return (
@@ -70,7 +73,7 @@ export default function HomePage() {
               width={600}
               height={400}
               className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square shadow-xl"
-              data-ai-hint="freelance community collaboration"
+              data-ai-hint="freelance community marketplace"
             />
           </div>
         </div>
@@ -87,7 +90,7 @@ export default function HomePage() {
           </div>
           <div className="mx-auto grid items-start gap-8 sm:max-w-4xl sm:grid-cols-2 md:gap-12 lg:max-w-5xl lg:grid-cols-2 xl:grid-cols-4">
             {features.map((feature, index) => (
-              <Card key={index} className="text-center p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift">
+              <Card key={index} className="text-center p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/70 backdrop-blur-sm">
                 {feature.icon}
                 <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground">{feature.description}</p>
@@ -105,19 +108,23 @@ export default function HomePage() {
               Найдите помощь или предложите свои услуги в одной из множества категорий.
             </p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {categories.map((category) => (
-              <Button key={category} variant="outline" className="h-auto py-3 shadow hover:shadow-md hover:border-accent hover:text-accent transition-all duration-300 hover-lift-sm" asChild>
-                <Link href={`/tasks?category=${encodeURIComponent(category)}`}>
-                  {category}
-                </Link>
-              </Button>
+              <Link key={category} href={`/tasks?category=${encodeURIComponent(category)}`} passHref legacyBehavior>
+                <a className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group">
+                  <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors">{category}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Найти задания в этой категории</p>
+                </a>
+              </Link>
             ))}
-             <Button variant="secondary" className="h-auto py-3 shadow hover:shadow-md transition-all duration-300 hover-lift-sm" asChild>
-                <Link href="/tasks">
-                  Все категории
-                </Link>
-              </Button>
+             <Link href="/tasks" passHref legacyBehavior>
+                <a className="block p-4 rounded-lg border bg-secondary hover:bg-accent/20 hover:border-accent text-secondary-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group flex flex-col items-center justify-center text-center sm:col-span-2 md:col-span-1 lg:col-span-4 min-h-[100px]">
+                  <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors flex items-center">
+                    Все категории <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"/>
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">Посмотреть все доступные задания</p>
+                </a>
+              </Link>
           </div>
         </div>
       </section>
@@ -126,7 +133,7 @@ export default function HomePage() {
         <div className="container px-4 md:px-6">
           <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Как это работает?</h2>
           <div className="grid gap-10 md:grid-cols-2">
-            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift">
+            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/70 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-2xl">Для заказчиков</CardTitle>
               </CardHeader>
@@ -136,7 +143,7 @@ export default function HomePage() {
                 <p><strong>3. Выберите лучшего:</strong> Свяжитесь с подходящим исполнителем и договоритесь о деталях.</p>
               </CardContent>
             </Card>
-            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift">
+            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/70 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-2xl">Для исполнителей</CardTitle>
               </CardHeader>
@@ -152,3 +159,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
