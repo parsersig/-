@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Flow for sending messages via Telegram Bot API.
@@ -11,7 +12,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const SendTelegramMessageInputSchema = z.object({
-  chatId: z.string().describe('The target chat ID (numeric) or username (e.g., @channelname). For private chats with users, a numeric chat ID is usually required.'),
+  chatId: z.string().describe('The target chat ID (numeric, e.g., -1001234567890 for groups/channels, or a positive number for users) or username (e.g., @channelname). For private chats with users, a numeric chat ID is usually required.'),
   messageText: z.string().describe('The content of the message to send.'),
 });
 export type SendTelegramMessageInput = z.infer<typeof SendTelegramMessageInputSchema>;
@@ -23,6 +24,7 @@ const SendTelegramMessageOutputSchema = z.object({
 });
 export type SendTelegramMessageOutput = z.infer<typeof SendTelegramMessageOutputSchema>;
 
+// It's important that this function is async and is the only export from this file.
 export async function sendTelegramMessage(input: SendTelegramMessageInput): Promise<SendTelegramMessageOutput> {
   return sendTelegramMessageFlow(input);
 }
@@ -37,10 +39,11 @@ const sendTelegramMessageFlow = ai.defineFlow(
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
     if (!botToken) {
-      console.error('TELEGRAM_BOT_TOKEN is not set in environment variables.');
+      const serverType = process.env.GENKIT_ENV === 'dev' ? 'Genkit dev server' : 'Next.js server';
+      console.error(`TELEGRAM_BOT_TOKEN is not set in environment variables. Checked on: ${serverType}`);
       return {
         success: false,
-        message: 'Ошибка конфигурации: TELEGRAM_BOT_TOKEN не найден на сервере. Пожалуйста, добавьте его в файл .env.local.',
+        message: `Ошибка конфигурации: TELEGRAM_BOT_TOKEN не найден на сервере (${serverType}). Пожалуйста, добавьте его в файл .env.local и перезапустите ВСЕ серверные процессы (Next.js и Genkit, если он запущен отдельно). Убедитесь, что имя переменной и файла точные.`,
       };
     }
 
@@ -70,9 +73,18 @@ const sendTelegramMessageFlow = ai.defineFlow(
         console.error('Telegram API Error:', responseData);
         const errorDescription = responseData.description || `HTTP status ${response.status}`;
         const errorCode = responseData.error_code ? ` (Код: ${responseData.error_code})` : '';
+        let detailedMessage = `Ошибка Telegram API: ${errorDescription}${errorCode}. Проверьте правильность ID чата/имени пользователя и токен бота.`;
+
+        if (responseData.error_code === 400 && errorDescription.toLowerCase().includes('chat not found')) {
+            detailedMessage += ' Убедитесь, что бот является участником указанного чата (группы/канала) и имеет права на отправку сообщений. Для каналов бот должен быть администратором с правом публикации.';
+        } else if (responseData.error_code === 403) {
+            detailedMessage += ' Убедитесь, что бот имеет необходимые разрешения для отправки сообщений в этот чат (например, не заблокирован пользователем или имеет права в группе/канале).';
+        }
+
+
         return {
           success: false,
-          message: `Ошибка Telegram API: ${errorDescription}${errorCode}. Проверьте правильность ID чата/имени пользователя и токен бота.`,
+          message: detailedMessage,
           telegramResponse: responseData,
         };
       }
