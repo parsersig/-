@@ -1,69 +1,33 @@
+
 // src/app/tasks/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle } from 'lucide-react';
-import type { StoredTask } from '@/lib/schemas';
+import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle, Loader2 } from 'lucide-react';
+import type { StoredTask } from '@/lib/schemas'; // Assuming StoredTask might need adjustment for Firestore data
 import { useToast } from "@/hooks/use-toast";
+import { db, auth } from '@/lib/firebase'; // Import db and auth
+import { doc, getDoc, updateDoc, increment, Timestamp } from 'firebase/firestore';
+import type { User } from 'firebase/auth';
 
-const LOCAL_STORAGE_TASKS_KEY = 'irbit-freelance-tasks';
-
-// Placeholder tasks (должны быть идентичны тем, что в /tasks/page.tsx для консистентности)
-const placeholderTasks: StoredTask[] = [
-  {
-    id: 'placeholder-1',
-    title: 'Починить протекающий кран на кухне',
-    description: 'Нужен сантехник для срочного ремонта кухонного смесителя. Капает вода, нужно заменить прокладки или картридж. Желательно сегодня или завтра утром. Инструменты ваши.',
-    category: 'Ремонт и строительство',
-    budget: 1500,
-    isNegotiable: false,
-    contactInfo: 'Телефон: 8-XXX-XXX-XX-XX',
-    postedDate: '2024-07-28',
-    city: 'Ирбит',
-    views: 15,
-  },
-  {
-    id: 'placeholder-2',
-    title: 'Генеральная уборка двухкомнатной квартиры',
-    description: 'Требуется полная уборка квартиры (50 кв.м) после выезда жильцов. Мытье окон, полов, санузла, кухни. Чистящие средства ваши или по договоренности.',
-    category: 'Уборка и помощь по хозяйству',
-    budget: 3000,
-    isNegotiable: false,
-    contactInfo: 'Telegram: @username',
-    postedDate: '2024-07-27',
-    city: 'Ирбит',
-    views: 32,
-  },
-  {
-    id: 'placeholder-3',
-    title: 'Доставить документы из центра в Зайково',
-    description: 'Срочно нужно передать пакет документов (небольшой конверт) из офиса на ул. Ленина в п. Зайково. Оплата сразу. Вес до 1 кг.',
-    category: 'Курьерские услуги',
-    budget: 500,
-    isNegotiable: false,
-    contactInfo: 'Звонить по номеру...',
-    postedDate: '2024-07-28',
-    city: 'Ирбит',
-    views: 8,
-  },
-  {
-    id: 'placeholder-4',
-    title: 'Помощь в настройке Wi-Fi роутера',
-    description: 'Купил новый роутер TP-Link, не могу подключить интернет и настроить Wi-Fi. Нужна помощь специалиста на дому. Район мотозавода.',
-    category: 'Компьютерная помощь',
-    budget: undefined,
-    isNegotiable: true,
-    contactInfo: 'Писать в ЛС',
-    postedDate: '2024-07-26',
-    city: 'Ирбит',
-    views: 22,
-  },
-];
-
+// Helper function to convert Firestore Timestamp to string or return existing string
+const formatDate = (date: any): string => {
+  if (!date) return 'Дата не указана';
+  if (date instanceof Timestamp) {
+    return date.toDate().toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+  if (typeof date === 'string') {
+    const parsedDate = new Date(date);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+  }
+  return 'Неверный формат даты';
+};
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -71,69 +35,118 @@ export default function TaskDetailPage() {
   const { toast } = useToast();
   const taskId = params.id as string;
   const [task, setTask] = useState<StoredTask | null | undefined>(undefined); // undefined - loading, null - not found
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (taskId) {
-      let allTasks: StoredTask[] = [...placeholderTasks];
-      const storedTasksRaw = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
-      if (storedTasksRaw) {
-        try {
-          const userTasks: StoredTask[] = JSON.parse(storedTasksRaw);
-          // Combine and remove duplicates, giving preference to user tasks if IDs match
-          const taskMap = new Map<string, StoredTask>();
-          placeholderTasks.forEach(pt => taskMap.set(pt.id, pt));
-          userTasks.forEach(ut => taskMap.set(ut.id, ut)); // User tasks overwrite placeholders
-          allTasks = Array.from(taskMap.values());
-        } catch (e) {
-          console.error("Failed to parse tasks from localStorage", e);
-        }
-      }
-      
-      // Sort tasks by postedDate in descending order (newest first)
-      allTasks.sort((a, b) => new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime());
-      
-      const foundTask = allTasks.find(t => t.id === taskId);
-      
-      if (foundTask) {
-        // Increment views only if the task is not a placeholder or if it was found in localStorage
-        let isUserTask = false;
-        if (storedTasksRaw) {
-            try {
-                const userTasks: StoredTask[] = JSON.parse(storedTasksRaw);
-                isUserTask = userTasks.some(ut => ut.id === taskId);
-            } catch (e) { /* ignore */ }
-        }
-
-        if (isUserTask) {
-            const updatedViews = (foundTask.views || 0) + 1;
-            const updatedTask = { ...foundTask, views: updatedViews };
-            setTask(updatedTask);
-
-            // Update views in localStorage only for user-created tasks
-            if (storedTasksRaw) {
-                try {
-                    const userTasks: StoredTask[] = JSON.parse(storedTasksRaw);
-                    const taskIndex = userTasks.findIndex(ut => ut.id === taskId);
-                    if (taskIndex > -1) {
-                        userTasks[taskIndex].views = updatedViews;
-                        localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(userTasks));
-                    }
-                } catch(e) {
-                    console.error("Error updating views in localStorage", e);
-                }
-            }
-        } else {
-             // For placeholder tasks, just set them without incrementing views in local storage
-            setTask(foundTask);
-        }
-      } else {
-        setTask(null); 
-      }
+    if (auth) {
+      const unsubscribe = auth.onAuthStateChanged(user => {
+        setCurrentUser(user);
+      });
+      return () => unsubscribe();
     }
-  }, [taskId]);
+  }, []);
+
+  const incrementViewCount = useCallback(async (currentTaskId: string) => {
+    if (!db) {
+      console.warn("Firestore not initialized, cannot increment view count.");
+      return;
+    }
+    // Simple session-based view tracking to avoid multiple increments by the same user in a short period
+    const viewedTasksKey = 'viewedTasks';
+    let viewedTasks: string[] = [];
+    try {
+      const storedValue = sessionStorage.getItem(viewedTasksKey);
+      if (storedValue) {
+        viewedTasks = JSON.parse(storedValue);
+      }
+    } catch (e) {
+      console.error("Error parsing viewed tasks from sessionStorage", e);
+    }
+
+    if (!viewedTasks.includes(currentTaskId)) {
+      try {
+        const taskRef = doc(db, "tasks", currentTaskId);
+        await updateDoc(taskRef, {
+          views: increment(1)
+        });
+        viewedTasks.push(currentTaskId);
+        sessionStorage.setItem(viewedTasksKey, JSON.stringify(viewedTasks));
+        console.log("View count incremented for task:", currentTaskId);
+      } catch (error) {
+        console.error("Error incrementing view count:", error);
+      }
+    } else {
+      console.log("Task already viewed in this session:", currentTaskId);
+    }
+  }, []);
+
+
+  useEffect(() => {
+    if (taskId && db) {
+      setIsLoading(true);
+      const fetchTask = async () => {
+        try {
+          const taskRef = doc(db, "tasks", taskId);
+          const taskSnap = await getDoc(taskRef);
+
+          if (taskSnap.exists()) {
+            const taskData = taskSnap.data();
+            const fetchedTask = {
+              id: taskSnap.id,
+              title: taskData.title,
+              description: taskData.description,
+              category: taskData.category,
+              budget: taskData.budget,
+              isNegotiable: taskData.isNegotiable,
+              contactInfo: taskData.contactInfo,
+              postedDate: formatDate(taskData.postedDate), // Convert Timestamp
+              city: taskData.city,
+              views: taskData.views,
+              userId: taskData.userId,
+            };
+            setTask(fetchedTask as StoredTask);
+            await incrementViewCount(taskId); // Increment views after task is fetched
+          } else {
+            console.log("No such document!");
+            setTask(null);
+          }
+        } catch (error) {
+          console.error("Error fetching task from Firestore:", error);
+          setTask(null);
+          toast({
+            title: "Ошибка загрузки",
+            description: "Не удалось загрузить детали задания. Попробуйте позже.",
+            variant: "destructive"
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchTask();
+    } else if (!db) {
+        console.warn("Firestore (db) is not initialized. Cannot fetch task.");
+        setIsLoading(false);
+        setTask(null); // Set task to null if db is not available
+         toast({
+            title: "Ошибка конфигурации",
+            description: "База данных не доступна. Проверьте настройки Firebase.",
+            variant: "destructive"
+          });
+    }
+  }, [taskId, incrementViewCount, toast]);
 
   const handleRespond = () => {
     if (!task) return;
+    if (!currentUser) {
+      toast({
+        title: "Требуется вход",
+        description: "Пожалуйста, войдите в систему, чтобы откликнуться на задание.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // TODO: Implement actual response saving to Firestore in the next step
     toast({
       title: "Отклик принят!",
       description: `Ваш отклик на задание «${task.title}» зарегистрирован. Заказчик получит уведомление, как только система откликов будет полностью интегрирована.`,
@@ -142,11 +155,11 @@ export default function TaskDetailPage() {
     });
   };
 
-  if (task === undefined) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <div className="text-center p-4">
-          <Briefcase className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground animate-pulse" />
+          <Loader2 className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-accent animate-spin" />
           <p className="mt-4 text-lg sm:text-xl text-muted-foreground">Загрузка деталей задания...</p>
         </div>
       </div>
@@ -216,7 +229,7 @@ export default function TaskDetailPage() {
               <CalendarDays className="h-5 w-5 mr-2 sm:mr-3 text-accent/80 shrink-0" />
               <div>
                 <span className="text-foreground/90 font-medium">Опубликовано:</span>
-                <span className="ml-1.5 text-muted-foreground">{new Date(task.postedDate).toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                <span className="ml-1.5 text-muted-foreground">{task.postedDate}</span>
               </div>
             </div>
             <div className="flex items-center sm:col-span-2">
@@ -230,21 +243,19 @@ export default function TaskDetailPage() {
               <Eye className="h-5 w-5 mr-2 sm:mr-3 text-accent/80 shrink-0" />
               <div>
               <span className="text-foreground/90 font-medium">Просмотров:</span>
-              <span className="ml-1.5 text-muted-foreground">{task.views}</span>
+              <span className="ml-1.5 text-muted-foreground">{task.views || 0}</span>
               </div>
             </div>
           </div>
         </CardContent>
         <CardFooter className="pt-5 sm:pt-6 px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
            <p className="text-sm text-muted-foreground text-center sm:text-left">Готовы взяться за это задание или есть вопросы?</p>
-          <Button size="lg" className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" onClick={handleRespond}>
+          <Button size="lg" className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" onClick={handleRespond} disabled={!currentUser}>
             <MessageSquare className="mr-2 h-5 w-5" />
-            Откликнуться
+            {currentUser ? "Откликнуться" : "Войдите, чтобы откликнуться"}
           </Button>
         </CardFooter>
       </Card>
     </div>
   );
 }
-
-    

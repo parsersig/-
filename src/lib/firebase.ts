@@ -19,9 +19,8 @@ const firebaseConfig = {
 
 let app: FirebaseApp | undefined = undefined;
 let authInstance: Auth | null = null;
-let dbInstance: Firestore | null = null; // Declare dbInstance
+let dbInstance: Firestore | null = null;
 
-// Initialize Firebase only if not already initialized and essential keys are present
 if (!getApps().length) {
   if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     try {
@@ -30,24 +29,27 @@ if (!getApps().length) {
       dbInstance = getFirestore(app); // Initialize Firestore
     } catch (e: any) {
       console.error("Firebase Critical Error: Failed to initialize Firebase app. Check your Firebase config values:", e.message);
-      // app remains undefined, authInstance and dbInstance remain null
+      if (process.env.NODE_ENV === 'development') {
+        alert("Критическая ошибка Firebase: Не удалось инициализировать приложение. Проверьте конфигурацию Firebase в .env.local и в консоли Firebase.");
+      }
     }
   } else {
     if (process.env.NODE_ENV === 'development') {
       console.warn("Firebase Config Warning: NEXT_PUBLIC_FIREBASE_API_KEY or NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set. Firebase features will be unavailable. Please check your .env.local file.");
+      // alert("Конфигурация Firebase не полная. Некоторые функции могут быть недоступны. Проверьте .env.local.");
     }
   }
 } else {
   app = getApps()[0];
   // If app was initialized by getApps(), try to get auth and db if essential keys are present
   if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-    try {
+     try {
         authInstance = getAuth(app);
-        dbInstance = getFirestore(app); // Initialize Firestore
+        dbInstance = getFirestore(app);
     } catch (e:any) {
         console.error("Firebase Services Error: Failed to get Auth or Firestore instance on re-initialized app.", e.message);
     }
   }
 }
 
-export { app, authInstance as auth, dbInstance as db }; // Export app, auth, and db
+export { app, authInstance as auth, dbInstance as db };
