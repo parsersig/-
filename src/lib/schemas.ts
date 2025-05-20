@@ -1,5 +1,6 @@
 
 import { z } from 'zod';
+import type { Timestamp } from 'firebase/firestore';
 
 export const taskCategories = [
   "Ремонт и строительство",
@@ -26,14 +27,14 @@ export const taskSchema = z.object({
   description: z.string()
     .min(20, { message: "Описание должно содержать минимум 20 символов." })
     .max(2000, { message: "Описание не должно превышать 2000 символов." }),
-  category: z.enum(taskCategories, { 
-    errorMap: () => ({ message: "Пожалуйста, выберите категорию." }) 
+  category: z.enum(taskCategories, {
+    errorMap: () => ({ message: "Пожалуйста, выберите категорию." })
   }),
   budget: z.preprocess(
     (val) => {
-      if (typeof val === 'string' && val.trim() === '') return undefined; 
+      if (typeof val === 'string' && val.trim() === '') return undefined;
       const num = parseFloat(String(val));
-      return isNaN(num) ? val : num; 
+      return isNaN(num) ? val : num;
     },
     z.number({ invalid_type_error: "Бюджет должен быть числом." })
       .positive({ message: "Бюджет должен быть положительным числом." })
@@ -47,11 +48,30 @@ export const taskSchema = z.object({
 
 export type TaskFormValues = z.infer<typeof taskSchema>;
 
-// Тип для задач, хранящихся в localStorage и отображаемых
-export type StoredTask = TaskFormValues & {
+// Тип для задач, хранящихся в Firestore и отображаемых
+export interface StoredTask extends TaskFormValues {
   id: string;
-  postedDate: string; // YYYY-MM-DD
+  postedDate: string; // Уже сконвертированная строка для отображения
+  firestorePostedDate?: Timestamp; // Оригинальный Timestamp из Firestore для сортировки и т.д.
   city: string;
   views: number;
-  userId?: string; // ID пользователя, создавшего задание (опционально для обратной совместимости)
+  userId?: string;
+}
+
+// Схема для отклика на задание
+export const responseSchema = z.object({
+  taskId: z.string(),
+  taskTitle: z.string(),
+  taskCategory: z.enum(taskCategories),
+  taskOwnerId: z.string(), // ID пользователя, создавшего задание
+  responderId: z.string(), // ID пользователя, оставившего отклик
+  responderName: z.string().nullable().optional(),
+  responderPhotoURL: z.string().url().nullable().optional(),
+  // respondedAt будет добавляться как serverTimestamp()
+});
+
+export type ResponseData = z.infer<typeof responseSchema> & {
+  id: string;
+  respondedAt: string; // Уже сконвертированная строка для отображения
+  firestoreRespondedAt?: Timestamp; // Оригинальный Timestamp из Firestore
 };

@@ -7,14 +7,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle, Loader2 } from 'lucide-react';
-import type { StoredTask } from '@/lib/schemas'; // Assuming StoredTask might need adjustment for Firestore data
+import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle } from 'lucide-react';
+import type { StoredTask, ResponseData } from '@/lib/schemas';
 import { useToast } from "@/hooks/use-toast";
-import { db, auth } from '@/lib/firebase'; // Import db and auth
-import { doc, getDoc, updateDoc, increment, Timestamp } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { doc, getDoc, updateDoc, increment, Timestamp, collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 
-// Helper function to convert Firestore Timestamp to string or return existing string
 const formatDate = (date: any): string => {
   if (!date) return 'Дата не указана';
   if (date instanceof Timestamp) {
@@ -34,9 +33,11 @@ export default function TaskDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
   const taskId = params.id as string;
-  const [task, setTask] = useState<StoredTask | null | undefined>(undefined); // undefined - loading, null - not found
+  const [task, setTask] = useState<StoredTask | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [isResponding, setIsResponding] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [hasResponded, setHasResponded] = useState(false);
 
   useEffect(() => {
     if (auth) {
@@ -52,27 +53,17 @@ export default function TaskDetailPage() {
       console.warn("Firestore not initialized, cannot increment view count.");
       return;
     }
-    // Simple session-based view tracking to avoid multiple increments by the same user in a short period
-    const viewedTasksKey = 'viewedTasks';
-    let viewedTasks: string[] = [];
-    try {
-      const storedValue = sessionStorage.getItem(viewedTasksKey);
-      if (storedValue) {
-        viewedTasks = JSON.parse(storedValue);
-      }
-    } catch (e) {
-      console.error("Error parsing viewed tasks from sessionStorage", e);
-    }
-
-    if (!viewedTasks.includes(currentTaskId)) {
+    const viewedTasksKey = `viewedTask_${currentTaskId}`;
+    if (!sessionStorage.getItem(viewedTasksKey)) {
       try {
         const taskRef = doc(db, "tasks", currentTaskId);
         await updateDoc(taskRef, {
           views: increment(1)
         });
-        viewedTasks.push(currentTaskId);
-        sessionStorage.setItem(viewedTasksKey, JSON.stringify(viewedTasks));
+        sessionStorage.setItem(viewedTasksKey, 'true');
         console.log("View count incremented for task:", currentTaskId);
+        // Optimistically update task state or re-fetch for immediate UI update
+        setTask(prev => prev ? ({ ...prev, views: (prev.views || 0) + 1 }) : null);
       } catch (error) {
         console.error("Error incrementing view count:", error);
       }
@@ -81,12 +72,12 @@ export default function TaskDetailPage() {
     }
   }, []);
 
-
   useEffect(() => {
     if (taskId && db) {
       setIsLoading(true);
       const fetchTask = async () => {
         try {
+          console.log(`Fetching task with ID: ${taskId}`);
           const taskRef = doc(db, "tasks", taskId);
           const taskSnap = await getDoc(taskRef);
 
@@ -94,19 +85,11 @@ export default function TaskDetailPage() {
             const taskData = taskSnap.data();
             const fetchedTask = {
               id: taskSnap.id,
-              title: taskData.title,
-              description: taskData.description,
-              category: taskData.category,
-              budget: taskData.budget,
-              isNegotiable: taskData.isNegotiable,
-              contactInfo: taskData.contactInfo,
-              postedDate: formatDate(taskData.postedDate), // Convert Timestamp
-              city: taskData.city,
-              views: taskData.views,
-              userId: taskData.userId,
-            };
-            setTask(fetchedTask as StoredTask);
-            await incrementViewCount(taskId); // Increment views after task is fetched
+              ...taskData,
+              postedDate: formatDate(taskData.postedDate),
+            } as StoredTask;
+            setTask(fetchedTask);
+            await incrementViewCount(taskId);
           } else {
             console.log("No such document!");
             setTask(null);
@@ -125,19 +108,31 @@ export default function TaskDetailPage() {
       };
       fetchTask();
     } else if (!db) {
-        console.warn("Firestore (db) is not initialized. Cannot fetch task.");
-        setIsLoading(false);
-        setTask(null); // Set task to null if db is not available
-         toast({
-            title: "Ошибка конфигурации",
-            description: "База данных не доступна. Проверьте настройки Firebase.",
-            variant: "destructive"
-          });
+      console.warn("Firestore (db) is not initialized. Cannot fetch task.");
+      setIsLoading(false);
+      setTask(null);
+      toast({
+        title: "Ошибка конфигурации",
+        description: "База данных не доступна. Проверьте настройки Firebase.",
+        variant: "destructive"
+      });
     }
   }, [taskId, incrementViewCount, toast]);
 
-  const handleRespond = () => {
-    if (!task) return;
+  useEffect(() => {
+    if (currentUser && task && db) {
+      const checkResponseStatus = async () => {
+        const responsesRef = collection(db, "responses");
+        const q = query(responsesRef, where("taskId", "==", task.id), where("responderId", "==", currentUser.uid));
+        const querySnapshot = await getDocs(q);
+        setHasResponded(!querySnapshot.empty);
+      };
+      checkResponseStatus();
+    }
+  }, [currentUser, task, db]);
+
+  const handleRespond = async () => {
+    if (!task || !db) return;
     if (!currentUser) {
       toast({
         title: "Требуется вход",
@@ -146,13 +141,60 @@ export default function TaskDetailPage() {
       });
       return;
     }
-    // TODO: Implement actual response saving to Firestore in the next step
-    toast({
-      title: "Отклик принят!",
-      description: `Ваш отклик на задание «${task.title}» зарегистрирован. Заказчик получит уведомление, как только система откликов будет полностью интегрирована.`,
-      variant: "default",
-      duration: 7000,
-    });
+
+    if (task.userId === currentUser.uid) {
+      toast({
+        title: "Невозможно откликнуться",
+        description: "Вы не можете откликнуться на собственное задание.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (hasResponded) {
+      toast({
+        title: "Вы уже откликались",
+        description: "Вы уже отправляли отклик на это задание.",
+        variant: "default",
+      });
+      return;
+    }
+
+    setIsResponding(true);
+    try {
+      console.log("Attempting to save response to Firestore. Task:", task, "User:", currentUser);
+      const responseData: Omit<ResponseData, 'id' | 'respondedAt' | 'firestoreRespondedAt'> = {
+        taskId: task.id,
+        taskTitle: task.title,
+        taskCategory: task.category,
+        taskOwnerId: task.userId || "unknown_owner",
+        responderId: currentUser.uid,
+        responderName: currentUser.displayName || "Анонимный исполнитель",
+        responderPhotoURL: currentUser.photoURL || null,
+      };
+
+      await addDoc(collection(db, "responses"), {
+        ...responseData,
+        respondedAt: serverTimestamp(),
+      });
+
+      toast({
+        title: "Отлично!",
+        description: `Ваш отклик на задание «${task.title}» успешно отправлен и сохранен в базе данных!`,
+        variant: "default",
+        duration: 7000,
+      });
+      setHasResponded(true); // Обновляем статус, что пользователь откликнулся
+    } catch (error) {
+      console.error("Failed to save response to Firestore", error);
+      toast({
+        title: "Ошибка сохранения отклика",
+        description: `Не удалось сохранить ваш отклик. ${error instanceof Error ? error.message : 'Пожалуйста, попробуйте еще раз.'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsResponding(false);
+    }
   };
 
   if (isLoading) {
@@ -169,13 +211,13 @@ export default function TaskDetailPage() {
   if (task === null) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-200px)] text-center p-4">
-        <Briefcase className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-destructive mb-4" />
+        <AlertCircle className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-destructive mb-4" />
         <h1 className="text-2xl sm:text-3xl font-bold text-destructive">Задание не найдено</h1>
         <p className="mt-2 text-md sm:text-lg text-muted-foreground">
           Возможно, задание было удалено или ссылка некорректна.
         </p>
         <Button asChild className="mt-6 hover-scale text-base sm:text-lg px-6 py-3">
-          <Link href="/tasks" legacyBehavior>
+          <Link href="/tasks">
             <ArrowLeft className="mr-2 h-5 w-5" />
             Вернуться ко всем заданиям
           </Link>
@@ -201,13 +243,13 @@ export default function TaskDetailPage() {
               </CardDescription>
             </div>
             <div className="mt-2 md:mt-0 md:text-right shrink-0">
-                <div className="flex items-center text-lg sm:text-xl font-semibold text-accent">
-                  <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5" />
-                  {task.budget ? `${task.budget.toLocaleString()} ₽` : (task.isNegotiable ? 'Цена договорная' : 'Бюджет не указан')}
-                </div>
-                {task.isNegotiable && task.budget && (
-                   <p className="text-xs text-muted-foreground">(также возможен торг)</p>
-                )}
+              <div className="flex items-center text-lg sm:text-xl font-semibold text-accent">
+                <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5" />
+                {task.budget ? `${task.budget.toLocaleString()} ₽` : (task.isNegotiable ? 'Цена договорная' : 'Бюджет не указан')}
+              </div>
+              {task.isNegotiable && task.budget && (
+                <p className="text-xs text-muted-foreground">(также возможен торг)</p>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -216,7 +258,7 @@ export default function TaskDetailPage() {
             <h3 className="text-lg sm:text-xl font-semibold mb-2 text-foreground/90">Описание задания:</h3>
             <p className="text-base text-muted-foreground whitespace-pre-line leading-relaxed">{task.description}</p>
           </div>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 sm:gap-x-8 gap-y-3 sm:gap-y-4 text-sm">
             <div className="flex items-center">
               <MapPin className="h-5 w-5 mr-2 sm:mr-3 text-accent/80 shrink-0" />
@@ -235,24 +277,36 @@ export default function TaskDetailPage() {
             <div className="flex items-center sm:col-span-2">
               <UserCircle className="h-5 w-5 mr-2 sm:mr-3 text-accent/80 shrink-0" />
               <div>
-                 <span className="text-foreground/90 font-medium">Контакты для связи:</span>
+                <span className="text-foreground/90 font-medium">Контакты для связи:</span>
                 <span className="ml-1.5 text-muted-foreground">{task.contactInfo}</span>
               </div>
             </div>
             <div className="flex items-center">
               <Eye className="h-5 w-5 mr-2 sm:mr-3 text-accent/80 shrink-0" />
               <div>
-              <span className="text-foreground/90 font-medium">Просмотров:</span>
-              <span className="ml-1.5 text-muted-foreground">{task.views || 0}</span>
+                <span className="text-foreground/90 font-medium">Просмотров:</span>
+                <span className="ml-1.5 text-muted-foreground">{task.views || 0}</span>
               </div>
             </div>
           </div>
         </CardContent>
         <CardFooter className="pt-5 sm:pt-6 px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-           <p className="text-sm text-muted-foreground text-center sm:text-left">Готовы взяться за это задание или есть вопросы?</p>
-          <Button size="lg" className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" onClick={handleRespond} disabled={!currentUser}>
-            <MessageSquare className="mr-2 h-5 w-5" />
-            {currentUser ? "Откликнуться" : "Войдите, чтобы откликнуться"}
+          <p className="text-sm text-muted-foreground text-center sm:text-left">Готовы взяться за это задание или есть вопросы?</p>
+          <Button
+            size="lg"
+            className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale"
+            onClick={handleRespond}
+            disabled={!currentUser || isResponding || task.userId === currentUser?.uid || hasResponded}
+          >
+            {isResponding ? (
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            ) : (
+              <MessageSquare className="mr-2 h-5 w-5" />
+            )}
+            {currentUser ? 
+              (task.userId === currentUser.uid ? "Это ваше задание" : (hasResponded ? "Вы уже откликнулись" : (isResponding ? "Отправка..." : "Откликнуться")))
+              : "Войдите, чтобы откликнуться"
+            }
           </Button>
         </CardFooter>
       </Card>
