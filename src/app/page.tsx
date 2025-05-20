@@ -14,9 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import { messageFormSchema, type MessageFormValues } from '@/lib/schemas';
 import StatusIndicator, { type StatusIconType } from '@/components/status-indicator';
 import { Play, Pause, BotMessageSquare, MessageCircle, Info, BarChartHorizontalBig } from 'lucide-react';
+import { sendTelegramMessage, type SendTelegramMessageOutput } from '@/ai/flows/telegram-sender-flow';
 
 const SEND_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-// const SEND_INTERVAL_MS = 10 * 1000; // 10 seconds for testing
+// const SEND_INTERVAL_MS = 15 * 1000; // 15 seconds for testing
 
 export default function AutoMessengerPage() {
   const { toast } = useToast();
@@ -35,7 +36,7 @@ export default function AutoMessengerPage() {
   const form = useForm<MessageFormValues>({
     resolver: zodResolver(messageFormSchema),
     defaultValues: {
-      targetBotUsername: '',
+      targetBotUsername: '', // Now accepts chat ID or @username
       messageContent: '',
     },
   });
@@ -44,40 +45,53 @@ export default function AutoMessengerPage() {
     let intervalId: NodeJS.Timeout | undefined;
 
     if (isRunning && currentConfig) {
-      const sendMessage = async () => {
+      const performSendMessage = async () => {
         setIsSending(true);
         setLastSendError(null);
         
-        // Simulate API call to Telegram
-        await new Promise(resolve => setTimeout(resolve, 1500)); 
-
-        const isSuccess = Math.random() > 0.15; // 85% success rate
-
-        if (isSuccess) {
-          const currentTime = new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLastSentTime(currentTime);
-          setAnimationTrigger('success');
-          setTotalSentSuccess(prev => prev + 1);
-          toast({
-            title: "Сообщение отправлено",
-            description: `Сообщение для ${currentConfig.targetBotUsername} успешно отправлено в ${currentTime}.`,
+        try {
+          const result: SendTelegramMessageOutput = await sendTelegramMessage({
+            chatId: currentConfig.targetBotUsername,
+            messageText: currentConfig.messageContent,
           });
-        } else {
-          const errorMsg = "Не удалось отправить сообщение. Проверьте данные или попробуйте позже.";
+
+          if (result.success) {
+            const currentTime = new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setLastSentTime(currentTime);
+            setAnimationTrigger('success');
+            setTotalSentSuccess(prev => prev + 1);
+            toast({
+              title: "Сообщение отправлено",
+              description: `Сообщение для "${currentConfig.targetBotUsername}" успешно отправлено в ${currentTime}.`,
+            });
+          } else {
+            const errorMsg = result.message || "Не удалось отправить сообщение. Проверьте данные или попробуйте позже.";
+            setLastSendError(errorMsg);
+            setLastSentTime(null); 
+            setTotalSentFailed(prev => prev + 1);
+            toast({
+              title: "Ошибка отправки",
+              description: errorMsg,
+              variant: "destructive",
+            });
+          }
+        } catch (error: any) {
+          const errorMsg = error.message || "Произошла неожиданная ошибка при отправке.";
           setLastSendError(errorMsg);
-          setLastSentTime(null); // Clear last successful send time on error
+          setLastSentTime(null);
           setTotalSentFailed(prev => prev + 1);
           toast({
-            title: "Ошибка отправки",
+            title: "Критическая ошибка",
             description: errorMsg,
             variant: "destructive",
           });
+        } finally {
+          setIsSending(false);
         }
-        setIsSending(false);
       };
 
-      sendMessage(); // Send immediately once on start
-      intervalId = setInterval(sendMessage, SEND_INTERVAL_MS);
+      performSendMessage(); // Send immediately once on start
+      intervalId = setInterval(performSendMessage, SEND_INTERVAL_MS);
     }
 
     return () => {
@@ -85,31 +99,28 @@ export default function AutoMessengerPage() {
     };
   }, [isRunning, currentConfig, toast]);
 
-  // Reset animation trigger
   React.useEffect(() => {
     if (animationTrigger === 'success') {
-      const timer = setTimeout(() => setAnimationTrigger('none'), 700); // Animation duration + buffer
+      const timer = setTimeout(() => setAnimationTrigger('none'), 700); 
       return () => clearTimeout(timer);
     }
   }, [animationTrigger]);
 
   function onSubmit(data: MessageFormValues) {
-    if (isRunning) { // Stop current
+    if (isRunning) { 
       setIsRunning(false);
       setIsSending(false);
-      // setCurrentConfig(null); // Keep form filled, messenger is just paused
       toast({ title: "Авто-мессенджер остановлен." });
-    } else { // Start new
+    } else { 
       setCurrentConfig(data);
       setIsRunning(true);
       setLastSentTime(null);
       setLastSendError(null);
-      // Reset stats for the new session
       setTotalSentSuccess(0);
       setTotalSentFailed(0);
       toast({
         title: "Авто-мессенджер запущен!",
-        description: `Сообщения для ${data.targetBotUsername} будут отправляться каждые 10 минут.`,
+        description: `Сообщения для "${data.targetBotUsername}" будут отправляться каждые 10 минут.`,
       });
     }
   }
@@ -135,7 +146,7 @@ export default function AutoMessengerPage() {
   const calculateSuccessRate = () => {
     const totalAttempts = totalSentSuccess + totalSentFailed;
     if (totalAttempts === 0) {
-      return 'Н/Д'; // Нет данных / Неприменимо
+      return 'Н/Д';
     }
     return `${((totalSentSuccess / totalAttempts) * 100).toFixed(1)}%`;
   };
@@ -148,7 +159,7 @@ export default function AutoMessengerPage() {
             <BotMessageSquare className="h-8 w-8 text-primary" />
             <div>
               <CardTitle className="text-2xl font-semibold">Телеграм Авто-Мессенджер</CardTitle>
-              <CardDescription className="text-sm">Настройте автоматическую отправку сообщений боту.</CardDescription>
+              <CardDescription className="text-sm">Настройте автоматическую отправку сообщений через Telegram бота.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -160,12 +171,12 @@ export default function AutoMessengerPage() {
                 name="targetBotUsername"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base">Имя пользователя целевого бота</FormLabel>
+                    <FormLabel className="text-base">ID чата / Имя пользователя (напр. @channel или 123456789)</FormLabel>
                     <FormControl>
                       <div className="relative flex items-center">
                         <MessageCircle className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                         <Input 
-                          placeholder="@target_bot_username" {...field} 
+                          placeholder="@channel или ID чата" {...field} 
                           className="pl-10 text-base h-12 rounded-lg" 
                           disabled={isRunning && !isSending}
                         />
@@ -226,7 +237,7 @@ export default function AutoMessengerPage() {
                 </p>
               )}
               {lastSendError && isRunning && (
-                 <p className="text-sm text-center text-destructive">
+                 <p className="text-sm text-center text-destructive break-all">
                   Детали ошибки: <span className="font-medium">{lastSendError}</span>
                 </p>
               )}
@@ -247,17 +258,16 @@ export default function AutoMessengerPage() {
               )}
             </div>
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center">
-              <Info className="h-3 w-3 mr-1"/> Сообщения будут отправляться каждые 10 минут.
+              <Info className="h-3 w-3 mr-1"/> Сообщения будут отправляться каждые 10 минут (если активно).
             </p>
           </div>
         </CardContent>
         <CardFooter className="bg-card p-4">
           <p className="text-xs text-muted-foreground text-center w-full">
-            Автоматическая отправка активна только пока эта страница открыта в браузере.
+            Автоматическая отправка активна только пока эта страница открыта в браузере и есть подключение к интернету.
           </p>
         </CardFooter>
       </Card>
     </div>
   );
 }
-
