@@ -41,7 +41,7 @@ export default function CreateTaskPage() {
   async function onSubmit(data: TaskFormValues) {
     const newTask: StoredTask = {
       ...data,
-      id: `task-${Date.now().toString()}`, // Unique ID
+      id: `task-${Date.now().toString()}-${Math.random().toString(36).substring(2, 7)}`, // More unique ID
       postedDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
       city: "Ирбит",
       views: 0,
@@ -56,12 +56,12 @@ export default function CreateTaskPage() {
       toast({
         title: "Задание успешно создано!",
         description: (
-          <div>
+          <div className="text-sm">
             <p>Ваше задание "{newTask.title}" сохранено локально.</p>
-            <p>Оно будет отображаться на странице просмотра заданий в вашем браузере.</p>
+            <p>Оно будет отображаться на странице просмотра заданий.</p>
           </div>
         ),
-        variant: "default",
+        variant: "default", // 'default' is usually for success, shadcn might use different variants
       });
       form.reset(); 
     } catch (error) {
@@ -75,32 +75,32 @@ export default function CreateTaskPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-2xl mx-auto"> {/* Slightly reduced max-width for better form appearance */}
       <Card className="shadow-xl bg-card/70 backdrop-blur-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center space-x-3">
             <Edit3 className="h-8 w-8 text-accent" />
             <div>
-              <CardTitle className="text-3xl font-bold">Создать новое задание</CardTitle>
-              <CardDescription className="text-md text-muted-foreground pt-1">
+              <CardTitle className="text-2xl sm:text-3xl font-bold">Создать новое задание</CardTitle>
+              <CardDescription className="text-sm sm:text-md text-muted-foreground pt-1">
                 Опишите вашу задачу, и найдутся исполнители в Ирбите!
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-2 sm:pt-4"> {/* Adjusted padding */}
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
               <FormField
                 control={form.control}
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg flex items-center"><FileText className="h-5 w-5 mr-2 text-accent/80"/>Название задания</FormLabel>
+                    <FormLabel className="text-md sm:text-lg flex items-center"><FileText className="h-5 w-5 mr-2 text-accent/80"/>Название задания</FormLabel>
                     <FormControl>
                       <Input placeholder="Например, 'Нужен ремонт стиральной машины'" {...field} className="h-12 text-base" />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs sm:text-sm">
                       Кратко и понятно опишите суть задачи.
                     </FormDescription>
                     <FormMessage />
@@ -113,15 +113,15 @@ export default function CreateTaskPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg">Подробное описание</FormLabel>
+                    <FormLabel className="text-md sm:text-lg">Подробное описание</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder="Опишите все детали: что нужно сделать, какие материалы использовать, сроки, особые требования и т.д."
-                        className="min-h-[150px] text-base"
+                        className="min-h-[120px] sm:min-h-[150px] text-base"
                         {...field}
                       />
                     </FormControl>
-                     <FormDescription>
+                     <FormDescription className="text-xs sm:text-sm">
                       Чем подробнее описание, тем быстрее найдется подходящий исполнитель.
                     </FormDescription>
                     <FormMessage />
@@ -134,7 +134,7 @@ export default function CreateTaskPage() {
                 name="category"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg flex items-center"><ListChecks className="h-5 w-5 mr-2 text-accent/80"/>Категория задания</FormLabel>
+                    <FormLabel className="text-md sm:text-lg flex items-center"><ListChecks className="h-5 w-5 mr-2 text-accent/80"/>Категория задания</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger className="h-12 text-base">
@@ -154,13 +154,13 @@ export default function CreateTaskPage() {
                 )}
               />
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6 sm:gap-y-8 items-start">
                 <FormField
                   control={form.control}
                   name="budget"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-lg flex items-center"><DollarSign className="h-5 w-5 mr-2 text-accent/80"/>Бюджет (₽)</FormLabel>
+                      <FormLabel className="text-md sm:text-lg flex items-center"><DollarSign className="h-5 w-5 mr-2 text-accent/80"/>Бюджет (₽)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -170,7 +170,7 @@ export default function CreateTaskPage() {
                           onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)}
                          />
                       </FormControl>
-                      <FormDescription>Укажите примерный бюджет или оставьте пустым, если цена договорная.</FormDescription>
+                      <FormDescription className="text-xs sm:text-sm">Укажите примерный бюджет или оставьте пустым, если цена договорная.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -179,7 +179,7 @@ export default function CreateTaskPage() {
                   control={form.control}
                   name="isNegotiable"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/30 mt-6 md:mt-12">
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3 sm:p-4 shadow-sm bg-muted/30 mt-6 md:mt-10"> {/* Adjusted mt */}
                       <FormControl>
                         <Checkbox
                           checked={field.value}
@@ -192,10 +192,10 @@ export default function CreateTaskPage() {
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
-                        <FormLabel>
+                        <FormLabel className="text-sm sm:text-base">
                           Цена договорная
                         </FormLabel>
-                        <FormDescription>
+                        <FormDescription className="text-xs sm:text-sm">
                           Если бюджет будет обсуждаться с исполнителем.
                         </FormDescription>
                       </div>
@@ -209,11 +209,11 @@ export default function CreateTaskPage() {
                 name="contactInfo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg flex items-center"><UserCircle className="h-5 w-5 mr-2 text-accent/80"/>Контактная информация</FormLabel>
+                    <FormLabel className="text-md sm:text-lg flex items-center"><UserCircle className="h-5 w-5 mr-2 text-accent/80"/>Контактная информация</FormLabel>
                     <FormControl>
                       <Input placeholder="Ваш телефон, Telegram или другой способ связи" {...field} className="h-12 text-base" />
                     </FormControl>
-                     <FormDescription>
+                     <FormDescription className="text-xs sm:text-sm">
                       Как исполнители смогут с вами связаться.
                     </FormDescription>
                     <FormMessage />
@@ -221,7 +221,7 @@ export default function CreateTaskPage() {
                 )}
               />
               
-              <Button type="submit" size="lg" className="w-full md:w-auto min-w-[200px] text-lg h-14 mt-8 shadow-lg hover-scale">
+              <Button type="submit" size="lg" className="w-full md:w-auto min-w-[180px] sm:min-w-[200px] text-md sm:text-lg h-12 sm:h-14 mt-6 sm:mt-8 shadow-lg hover-scale">
                 Опубликовать задание
               </Button>
             </form>

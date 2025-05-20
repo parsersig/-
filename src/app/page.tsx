@@ -61,7 +61,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col items-center">
-      <section className="w-full py-20 md:py-28 lg:py-36 bg-gradient-to-b from-background via-accent/5 to-background text-center">
+      <section className="w-full py-16 md:py-24 lg:py-32 bg-gradient-to-b from-background via-accent/5 to-background text-center">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center space-y-6">
             <Briefcase className="h-16 w-16 sm:h-20 sm:w-20 text-accent" />
@@ -72,11 +72,16 @@ export default function HomePage() {
               Ваша новая фриланс-площадка для поиска исполнителей и размещения заданий в городе Ирбит.
               Быстро, удобно и всегда под рукой для местных нужд.
             </p>
-            <div className="flex flex-col gap-3 min-[400px]:flex-row">
+            <div className="flex flex-col gap-4 sm:flex-row sm:gap-3">
               <Button asChild size="lg" className="shadow-lg hover-scale text-lg px-8 py-6">
                 <Link href="/tasks">Смотреть задания</Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="shadow-lg hover-scale hover:border-accent hover:text-accent text-lg px-8 py-6">
+              <Button 
+                asChild 
+                variant="outline" 
+                size="lg" 
+                className="shadow-lg hover-scale hover:bg-accent/10 hover:border-accent hover:text-accent text-lg px-8 py-6"
+              >
                 <Link href="/create-task">Разместить задание</Link>
               </Button>
             </div>
@@ -94,7 +99,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="features" className="w-full py-12 md:py-24 lg:py-32">
+      <section id="features" className="w-full py-12 md:py-24">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
             <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">Ключевые преимущества</div>
@@ -103,7 +108,7 @@ export default function HomePage() {
               Мы создали удобный инструмент для жителей Ирбита, чтобы упростить поиск помощи и подработки.
             </p>
           </div>
-          <div className="mx-auto grid items-start gap-8 sm:max-w-4xl sm:grid-cols-2 md:gap-12 lg:max-w-5xl lg:grid-cols-2 xl:grid-cols-4">
+          <div className="mx-auto grid items-start gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 lg:max-w-5xl">
             {features.map((feature, index) => (
               <Card key={index} className="text-center p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/70 backdrop-blur-sm">
                 {feature.icon}
@@ -115,7 +120,7 @@ export default function HomePage() {
         </div>
       </section>
       
-      <section id="categories" className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
+      <section id="categories" className="w-full py-12 md:py-24 bg-muted/50">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Популярные категории заданий</h2>
@@ -133,7 +138,7 @@ export default function HomePage() {
               </Link>
             ))}
              <Link href="/tasks" passHref legacyBehavior>
-                <a className="block p-4 rounded-lg border bg-secondary hover:bg-accent/20 hover:border-accent text-secondary-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group flex flex-col items-center justify-center text-center sm:col-span-2 md:col-span-1 lg:col-span-4 min-h-[100px]">
+                <a className="block p-4 rounded-lg border bg-secondary hover:bg-accent/20 hover:border-accent text-secondary-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group flex flex-col items-center justify-center text-center sm:col-span-2 md:col-span-1 lg:col-span-full min-h-[100px]"> {/* Changed to lg:col-span-full for better mobile stacking then full width */}
                   <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors flex items-center">
                     Все категории <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"/>
                   </h3>
@@ -144,10 +149,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="how-it-works" className="w-full py-12 md:py-24 lg:py-32">
+      <section id="how-it-works" className="w-full py-12 md:py-24">
         <div className="container px-4 md:px-6">
           <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Как это работает?</h2>
-          <div className="grid gap-10 md:grid-cols-2">
+          <div className="grid gap-8 md:gap-10 grid-cols-1 md:grid-cols-2">
             <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/70 backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="text-2xl">Для заказчиков</CardTitle>
