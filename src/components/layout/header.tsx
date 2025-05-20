@@ -1,6 +1,5 @@
 // src/components/layout/header.tsx
 "use client";
-
 import * as React from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -17,9 +16,9 @@ import {
   Search,
   LogIn,
   UserPlus,
-  FileText // Added for My Responses
+  FileText
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react'; // Ensure LucideIcon is imported
+import type { LucideIcon } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import {
   Sheet,
@@ -43,13 +42,8 @@ import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type 
 interface NavLink {
   href: string;
   label: string;
-  icon: LucideIcon; // Using LucideIcon type
+  icon: LucideIcon;
 }
-
-// Placeholder user state and auth functions
-// const initialUser: User | null = null; 
-// const isLoadingAuthInitially = true;
-
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -75,7 +69,6 @@ export default function Header() {
     }
   }, []);
 
-
   const handleLogin = async () => {
     if (!auth) {
       toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
@@ -93,12 +86,11 @@ export default function Header() {
         description: error.message || "Не удалось войти через Google. Попробуйте еще раз.",
         variant: "destructive",
       });
-      // setIsLoadingAuth(false); // onAuthStateChanged will handle this
     }
   };
 
   const handleLogout = async () => {
-     if (!auth) {
+    if (!auth) {
       toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
       return;
     }
@@ -114,10 +106,8 @@ export default function Header() {
         description: error.message || "Не удалось выйти из системы.",
         variant: "destructive",
       });
-      // setIsLoadingAuth(false); // onAuthStateChanged will handle this
     }
   };
-
 
   const mainNavLinks: NavLink[] = [
     { href: "/tasks", label: "Найти задания", icon: Search },
@@ -127,18 +117,10 @@ export default function Header() {
   const userMenuLinks: NavLink[] = [
     { href: "/profile", label: "Мой профиль", icon: UserCircle },
     { href: "/my-tasks", label: "Мои задания", icon: ListChecks },
-    { href: "/my-responses", label: "Мои отклики", icon: FileText }, // Using FileText
+    { href: "/my-responses", label: "Мои отклики", icon: FileText },
     { href: "/messages", label: "Сообщения", icon: MessageSquare },
     { href: "/notifications", label: "Уведомления", icon: Bell },
   ];
-  
-  const authNavLinks: NavLink[] = [
-    // These are placeholders if we want specific login/register pages later
-    // For now, they both trigger Google Sign-In
-    { href: "#login", label: "Войти", icon: LogIn },
-    { href: "#register", label: "Регистрация", icon: UserPlus },
-  ];
-
 
   if (isLoadingAuth) {
     return (
@@ -157,20 +139,15 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container flex h-16 items-center">
-        <Link href="/" className="mr-auto">
-          <span className="flex items-center space-x-2"> {/* Wrapper for multiple children */}
-            <Briefcase className="h-7 w-7 text-accent" />
-            <span className="font-bold text-lg sm:text-xl">Фриланс Ирбит</span>
-          </span>
+        <Link href="/" className="mr-auto flex items-center space-x-2">
+          <Briefcase className="h-7 w-7 text-accent" />
+          <span className="font-bold text-lg sm:text-xl">Фриланс Ирбит</span>
         </Link>
 
         <nav className="hidden md:flex items-center space-x-1 sm:space-x-2">
           {mainNavLinks.map((link) => (
             <Button variant="ghost" asChild key={link.href}>
-              <Link
-                href={link.href}
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-accent px-3 py-2"
-              >
+              <Link href={link.href} className="text-sm font-medium text-muted-foreground transition-colors hover:text-accent px-3 py-2">
                 {link.label}
               </Link>
             </Button>
@@ -217,7 +194,7 @@ export default function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-             <div className="space-x-1 sm:space-x-2">
+            <div className="space-x-1 sm:space-x-2">
               {auth ? (
                 <>
                   <Button variant="outline" size="sm" className="hover:border-accent hover:text-accent" onClick={handleLogin}>
@@ -228,7 +205,7 @@ export default function Header() {
                   </Button>
                 </>
               ) : (
-                 <p className="text-xs text-muted-foreground">Сервис входа недоступен</p>
+                <p className="text-xs text-muted-foreground">Сервис входа недоступен</p>
               )}
             </div>
           )}
@@ -245,10 +222,9 @@ export default function Header() {
             <SheetContent side="right" className="w-[280px] sm:w-[320px] pt-10 px-4">
               <nav className="flex flex-col space-y-2">
                 <SheetClose asChild>
-                  <Link
+                  <Link 
                     href="/"
                     className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50"
-                    onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <Home className="mr-3 h-6 w-6 text-accent/80" /> Главная
                   </Link>
@@ -258,10 +234,9 @@ export default function Header() {
                   const IconComponent = link.icon;
                   return (
                     <SheetClose asChild key={link.href}>
-                      <Link
+                      <Link 
                         href={link.href}
                         className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50"
-                        onClick={() => setIsMobileMenuOpen(false)}
                       >
                         <IconComponent className="mr-3 h-6 w-6 text-accent/80" />
                         {link.label}
@@ -278,10 +253,9 @@ export default function Header() {
                       const IconComponent = link.icon;
                       return (
                         <SheetClose asChild key={link.href}>
-                          <Link
+                          <Link 
                             href={link.href}
                             className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50"
-                            onClick={() => setIsMobileMenuOpen(false)}
                           >
                             <IconComponent className="mr-3 h-6 w-6 text-accent/80" />
                             {link.label}
@@ -289,6 +263,7 @@ export default function Header() {
                         </SheetClose>
                       );
                     })}
+
                     <SheetClose asChild>
                       <Button
                         variant="ghost"
@@ -302,30 +277,31 @@ export default function Header() {
                   </>
                 ) : (
                   <>
-                   {auth ? (
-                    <>
-                      <SheetClose asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full text-lg py-5"
-                          onClick={handleLogin}
-                        >
-                           <LogIn className="mr-2 h-5 w-5" /> Войти
-                        </Button>
-                      </SheetClose>
-                      <SheetClose asChild>
-                        <Button
-                          variant="default"
-                          className="w-full text-lg py-5 bg-accent text-accent-foreground hover:bg-accent/90"
-                          onClick={handleLogin}
-                        >
-                          <UserPlus className="mr-2 h-5 w-5" /> Регистрация
-                        </Button>
-                      </SheetClose>
-                    </>
-                     ) : (
-                        <p className="p-3 text-center text-muted-foreground">Сервис входа недоступен</p>
-                     )}
+                    {auth ? (
+                      <>
+                        <SheetClose asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full text-lg py-5"
+                            onClick={handleLogin}
+                          >
+                            <LogIn className="mr-2 h-5 w-5" /> Войти
+                          </Button>
+                        </SheetClose>
+                        
+                        <SheetClose asChild>
+                          <Button
+                            variant="default"
+                            className="w-full text-lg py-5 bg-accent text-accent-foreground hover:bg-accent/90"
+                            onClick={handleLogin}
+                          >
+                            <UserPlus className="mr-2 h-5 w-5" /> Регистрация
+                          </Button>
+                        </SheetClose>
+                      </>
+                    ) : (
+                      <p className="p-3 text-center text-muted-foreground">Сервис входа недоступен</p>
+                    )}
                   </>
                 )}
               </nav>

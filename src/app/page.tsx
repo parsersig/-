@@ -76,16 +76,16 @@ export default function HomePage() {
               <Button asChild size="lg" className="shadow-lg hover-scale text-lg px-8 py-6">
                 <Link href="/tasks">Смотреть задания</Link>
               </Button>
-              <Button 
-                asChild 
-                variant="outline" 
-                size="lg" 
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
                 className="shadow-lg hover-scale hover:bg-accent/10 hover:border-accent hover:text-accent text-lg px-8 py-6"
               >
                 <Link href="/create-task">Разместить задание</Link>
               </Button>
             </div>
-            
+
             <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl w-full">
               {stats.map((stat, index) => (
                 <div key={index} className="p-6 bg-card/60 backdrop-blur-sm rounded-xl shadow-lg text-center hover-lift transition-all duration-300 hover:shadow-accent/20">
@@ -119,7 +119,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-      
+
       <section id="categories" className="w-full py-12 md:py-24 bg-muted/50">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
@@ -130,20 +130,23 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {categories.map((category) => (
-              <Link key={category} href={`/tasks?category=${encodeURIComponent(category)}`} passHref legacyBehavior>
-                <a className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group">
-                  <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors">{category}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Найти задания в этой категории</p>
-                </a>
+              <Link
+                key={category}
+                href={`/tasks?category=${encodeURIComponent(category)}`}
+                className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group"
+              >
+                <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors">{category}</h3>
+                <p className="text-sm text-muted-foreground mt-1">Найти задания в этой категории</p>
               </Link>
             ))}
-             <Link href="/tasks" passHref legacyBehavior>
-                <a className="block p-4 rounded-lg border bg-secondary hover:bg-accent/20 hover:border-accent text-secondary-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group flex flex-col items-center justify-center text-center sm:col-span-2 md:col-span-1 lg:col-span-full min-h-[100px]"> {/* Changed to lg:col-span-full for better mobile stacking then full width */}
-                  <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors flex items-center">
-                    Все категории <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"/>
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">Посмотреть все доступные задания</p>
-                </a>
+             <Link
+                href="/tasks"
+                className="block p-4 rounded-lg border bg-secondary hover:bg-accent/20 hover:border-accent text-secondary-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group flex flex-col items-center justify-center text-center sm:col-span-2 md:col-span-1 lg:col-span-full min-h-[100px]"
+             >
+                <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors flex items-center">
+                  Все категории <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"/>
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">Посмотреть все доступные задания</p>
               </Link>
           </div>
         </div>
@@ -179,4 +182,3 @@ export default function HomePage() {
     </div>
   );
 }
-    
