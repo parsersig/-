@@ -30,8 +30,12 @@ if (!getApps().length) {
       // app remains undefined, authInstance remains null
     }
   } else {
-    // Do not output console.error during build if keys are intentionally missing for "Firebase disabled" state
-    // console.warn("Firebase Warning: Firebase initialization skipped because API key or Project ID is missing. Firebase features will be unavailable.");
+    // Output error only in development if keys are missing, to avoid breaking Vercel build if intentionally disabled
+    if (process.env.NODE_ENV === 'development') {
+      console.error("Firebase Config Error: NEXT_PUBLIC_FIREBASE_API_KEY or NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set. Firebase features will be unavailable. Please check your .env.local file.");
+    }
+    // To allow the app to build/run without Firebase for other features, we don't throw an error here
+    // but authInstance will remain null. Components using auth must handle this.
   }
 } else {
   app = getApps()[0];
@@ -58,5 +62,3 @@ if (!getApps().length) {
 // }
 
 export { app, authInstance as auth };
-
-  

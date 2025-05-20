@@ -20,7 +20,7 @@ export default function MyTasksPage() {
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
   useEffect(() => {
-    if (!auth) {
+    if (!auth) { // Check if Firebase auth is even configured/available
         setIsLoadingAuth(false);
         setIsLoadingTasks(false);
         return;

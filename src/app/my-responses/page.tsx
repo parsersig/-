@@ -15,7 +15,7 @@ export default function MyResponsesPage() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   useEffect(() => {
-    if (!auth) {
+    if (!auth) { // Check if Firebase auth is even configured/available
         setIsLoadingAuth(false);
         return;
     }

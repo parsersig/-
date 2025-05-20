@@ -35,7 +35,7 @@ export default function CreateTaskPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (auth) {
+    if (auth) { // Check if auth service is available
       const unsubscribe = auth.onAuthStateChanged(user => {
         setCurrentUser(user);
       });
@@ -57,13 +57,26 @@ export default function CreateTaskPage() {
   });
 
   async function onSubmit(data: TaskFormValues) {
+    if (!currentUser && auth) { // Added auth check here
+        toast({
+            title: "Требуется вход",
+            description: "Пожалуйста, войдите в систему, чтобы опубликовать задание.",
+            variant: "destructive",
+        });
+        return;
+    }
+    // If auth is null (not configured), allow posting without userId
+    // Or if auth is configured and user is logged in.
+    const userId = auth ? currentUser?.uid : undefined;
+
+
     const newTask: StoredTask = {
       ...data,
       id: `task-${Date.now().toString()}-${Math.random().toString(36).substring(2, 7)}`,
       postedDate: new Date().toISOString().split('T')[0],
       city: "Ирбит",
       views: 0,
-      userId: currentUser?.uid || undefined, // Add userId if user is logged in
+      userId: userId, 
     };
 
     try {
@@ -77,6 +90,7 @@ export default function CreateTaskPage() {
         description: (
           <div className="flex flex-col gap-2">
             <p>Ваше задание "{newTask.title}" сохранено локально.</p>
+             {currentUser && <p className="text-xs text-muted-foreground">Оно будет видно в разделе "Мои задания".</p>}
             <div className="flex gap-2 mt-2">
                 <Button variant="outline" size="sm" asChild>
                     <Link href={`/tasks/${newTask.id}`} className="flex items-center">
@@ -90,7 +104,7 @@ export default function CreateTaskPage() {
             </div>
           </div>
         ),
-        duration: 7000, // Longer duration for toast with actions
+        duration: 7000, 
       });
       form.reset(); 
     } catch (error) {
@@ -243,7 +257,7 @@ export default function CreateTaskPage() {
                       <Input placeholder="Ваш телефон, Telegram или другой способ связи" {...field} className="h-12 text-base" />
                     </FormControl>
                      <FormDescription className="text-xs sm:text-sm">
-                      Как исполнители смогут с вами связаться.
+                      Как исполнители смогут с вами связаться. {currentUser && `(по умолчанию будет использоваться ваш email: ${currentUser.email})`}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
