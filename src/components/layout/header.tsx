@@ -16,23 +16,37 @@ import { Briefcase, LogIn, LogOut, UserPlus, UserCircle, Settings, LayoutDashboa
 import { useEffect, useState } from 'react';
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // We will create this file
+import { auth } from '@/lib/firebase'; 
 import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    if (auth) { // Check if auth was initialized
+      setFirebaseInitialized(true);
+      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        setUser(currentUser);
+        setLoadingAuth(false);
+      });
+      return () => unsubscribe(); // Cleanup subscription on unmount
+    } else {
+      // Firebase auth failed to initialize (e.g. missing API key)
+      console.warn("Header: Firebase auth instance is not available. Auth features will be disabled.");
       setLoadingAuth(false);
-    });
-    return () => unsubscribe(); // Cleanup subscription on unmount
+      setFirebaseInitialized(false);
+    }
   }, []);
 
   const handleSignInWithGoogle = async () => {
+    if (!auth) {
+      console.error("Firebase Auth not initialized, cannot sign in.");
+      // Optionally show a toast to the user
+      return;
+    }
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
@@ -44,6 +58,10 @@ export default function Header() {
   };
 
   const handleSignOut = async () => {
+    if (!auth) {
+      console.error("Firebase Auth not initialized, cannot sign out.");
+      return;
+    }
     try {
       await signOut(auth);
       // User state will be updated by onAuthStateChanged
@@ -82,6 +100,7 @@ export default function Header() {
               Создать задание
             </Link>
           </Button>
+          {/* Можно добавить другие ссылки навигации здесь, если нужно */}
         </nav>
         <div className="flex items-center space-x-2 sm:space-x-3">
           {loadingAuth ? (
@@ -89,6 +108,10 @@ export default function Header() {
               <Skeleton className="h-9 w-20 rounded-md" />
               <Skeleton className="h-9 w-24 rounded-md" />
             </>
+          ) : !firebaseInitialized ? (
+             <Button variant="outline" size="sm" disabled>
+                Auth N/A
+              </Button>
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -151,5 +174,3 @@ export default function Header() {
     </header>
   );
 }
-
-    
