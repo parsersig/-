@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { ListFilter, Search, Briefcase, MapPin, DollarSign } from 'lucide-react';
-import type { TaskFormValues } from '@/lib/schemas'; // Assuming schema might be used later
+import type { TaskFormValues } from '@/lib/schemas'; 
 import { taskCategories } from '@/lib/schemas';
 
 // Placeholder tasks
@@ -94,7 +94,7 @@ export default function TasksPage() {
         </p>
       </div>
 
-      <Card className="shadow-lg">
+      <Card className="shadow-lg bg-card/70 backdrop-blur-sm">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4 items-end">
             <div className="md:col-span-2 lg:col-span-2 space-y-2">
@@ -125,7 +125,7 @@ export default function TasksPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button className="h-12 w-full md:w-auto" size="lg">
+            <Button className="h-12 w-full md:w-auto hover-scale" size="lg">
               <ListFilter className="mr-2 h-5 w-5" />
               Применить фильтры
             </Button>
@@ -136,7 +136,7 @@ export default function TasksPage() {
       {filteredTasks.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredTasks.map((task) => (
-            <Card key={task.id} className="flex flex-col shadow-lg hover:shadow-xl transition-shadow duration-300">
+            <Card key={task.id} className="flex flex-col shadow-lg hover:shadow-primary/30 transition-shadow duration-300 hover-lift">
               <CardHeader>
                 <CardTitle className="text-xl hover:text-primary transition-colors">
                   <Link href={`/tasks/${task.id}`}>{task.title}</Link>
@@ -153,12 +153,12 @@ export default function TasksPage() {
               </CardContent>
               <CardFooter className="flex justify-between items-center border-t pt-4">
                 <div className="flex items-center">
-                   <DollarSign className="h-5 w-5 text-green-600 mr-1.5" />
+                   <DollarSign className="h-5 w-5 text-green-500 mr-1.5" />
                   <span className="text-lg font-semibold text-foreground">
                     {task.budget ? `${task.budget.toLocaleString()} ₽` : 'Договорная'}
                   </span>
                 </div>
-                <Button asChild variant="default" size="sm">
+                <Button asChild variant="default" size="sm" className="hover-scale">
                   <Link href={`/tasks/${task.id}`}>Откликнуться</Link>
                 </Button>
               </CardFooter>
@@ -176,7 +176,7 @@ export default function TasksPage() {
           <p className="text-muted-foreground mt-2">
             Попробуйте изменить критерии поиска или загляните позже.
           </p>
-          <Button asChild className="mt-6">
+          <Button asChild className="mt-6 hover-scale">
             <Link href="/create-task">Создать новое задание</Link>
           </Button>
         </div>

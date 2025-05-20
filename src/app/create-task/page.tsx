@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { taskSchema, type TaskFormValues, taskCategories } from "@/lib/schemas";
-import { FileText, DollarSign, ListChecks, UserCircle } from 'lucide-react';
+import { FileText, DollarSign, ListChecks, UserCircle, Edit3 } from 'lucide-react';
 
 export default function CreateTaskPage() {
   const { toast } = useToast();
@@ -29,7 +29,7 @@ export default function CreateTaskPage() {
     defaultValues: {
       title: "",
       description: "",
-      category: undefined, // Or a default category from taskCategories[0]
+      category: undefined, 
       budget: undefined,
       isNegotiable: false,
       contactInfo: "",
@@ -37,25 +37,24 @@ export default function CreateTaskPage() {
   });
 
   async function onSubmit(data: TaskFormValues) {
-    // TODO: Implement actual task submission logic (e.g., API call)
     console.log("Task data:", data);
     toast({
       title: "Задание создано (демо)",
       description: (
-        <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
+        <pre className="mt-2 w-full max-w-[340px] rounded-md bg-slate-800 p-4 overflow-x-auto">
           <code className="text-white">{JSON.stringify(data, null, 2)}</code>
         </pre>
       ),
     });
-    form.reset(); // Reset form after submission
+    form.reset(); 
   }
 
   return (
     <div className="max-w-3xl mx-auto">
-      <Card className="shadow-xl">
+      <Card className="shadow-xl bg-card/70 backdrop-blur-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center space-x-3">
-            <FileText className="h-8 w-8 text-primary" />
+            <Edit3 className="h-8 w-8 text-primary" />
             <div>
               <CardTitle className="text-3xl font-bold">Создать новое задание</CardTitle>
               <CardDescription className="text-md text-muted-foreground pt-1">
@@ -190,17 +189,14 @@ export default function CreateTaskPage() {
                       <Input placeholder="Ваш телефон, Telegram или другой способ связи" {...field} className="h-12 text-base" />
                     </FormControl>
                      <FormDescription>
-                      Как исполнители смогут с вами связаться. Эта информация будет видна только выбранному исполнителю (в будущих версиях).
+                      Как исполнители смогут с вами связаться.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               
-              {/* TODO: Add location field if not restricted to Irbit, or for more specific addresses */}
-              {/* TODO: Add fields for deadlines, attachments, etc. */}
-
-              <Button type="submit" size="lg" className="w-full md:w-auto min-w-[200px] text-lg h-14 mt-8 shadow-lg">
+              <Button type="submit" size="lg" className="w-full md:w-auto min-w-[200px] text-lg h-14 mt-8 shadow-lg hover-scale">
                 Опубликовать задание
               </Button>
             </form>

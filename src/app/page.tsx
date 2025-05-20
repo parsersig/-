@@ -56,10 +56,10 @@ export default function HomePage() {
                 </p>
               </div>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                <Button asChild size="lg" className="shadow-lg">
+                <Button asChild size="lg" className="shadow-lg hover-scale">
                   <Link href="/tasks">Смотреть задания</Link>
                 </Button>
-                <Button asChild variant="outline" size="lg" className="shadow-lg">
+                <Button asChild variant="outline" size="lg" className="shadow-lg hover-scale">
                   <Link href="/create-task">Разместить задание</Link>
                 </Button>
               </div>
@@ -87,7 +87,7 @@ export default function HomePage() {
           </div>
           <div className="mx-auto grid items-start gap-8 sm:max-w-4xl sm:grid-cols-2 md:gap-12 lg:max-w-5xl lg:grid-cols-2 xl:grid-cols-4">
             {features.map((feature, index) => (
-              <Card key={index} className="text-center p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <Card key={index} className="text-center p-6 shadow-lg hover:shadow-primary/30 transition-shadow duration-300 hover-lift">
                 {feature.icon}
                 <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground">{feature.description}</p>
@@ -107,13 +107,13 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {categories.map((category) => (
-              <Button key={category} variant="outline" className="h-auto py-3 shadow hover:shadow-md" asChild>
+              <Button key={category} variant="outline" className="h-auto py-3 shadow hover:shadow-md hover:border-primary transition-all duration-300 hover-lift-sm" asChild>
                 <Link href={`/tasks?category=${encodeURIComponent(category)}`}>
                   {category}
                 </Link>
               </Button>
             ))}
-             <Button variant="secondary" className="h-auto py-3 shadow hover:shadow-md" asChild>
+             <Button variant="secondary" className="h-auto py-3 shadow hover:shadow-md transition-all duration-300 hover-lift-sm" asChild>
                 <Link href="/tasks">
                   Все категории
                 </Link>
@@ -126,7 +126,7 @@ export default function HomePage() {
         <div className="container px-4 md:px-6">
           <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Как это работает?</h2>
           <div className="grid gap-10 md:grid-cols-2">
-            <Card className="p-6 shadow-lg">
+            <Card className="p-6 shadow-lg hover:shadow-primary/30 transition-shadow duration-300 hover-lift">
               <CardHeader>
                 <CardTitle className="text-2xl">Для заказчиков</CardTitle>
               </CardHeader>
@@ -136,7 +136,7 @@ export default function HomePage() {
                 <p><strong>3. Выберите лучшего:</strong> Свяжитесь с подходящим исполнителем и договоритесь о деталях.</p>
               </CardContent>
             </Card>
-            <Card className="p-6 shadow-lg">
+            <Card className="p-6 shadow-lg hover:shadow-primary/30 transition-shadow duration-300 hover-lift">
               <CardHeader>
                 <CardTitle className="text-2xl">Для исполнителей</CardTitle>
               </CardHeader>
