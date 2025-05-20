@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -12,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { messageFormSchema, type MessageFormValues } from '@/lib/schemas';
 import StatusIndicator, { type StatusIconType } from '@/components/status-indicator';
-import { Play, Pause, BotMessageSquare, MessageCircle, Info } from 'lucide-react';
+import { Play, Pause, BotMessageSquare, MessageCircle, Info, BarChartHorizontalBig } from 'lucide-react';
 
 const SEND_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 // const SEND_INTERVAL_MS = 10 * 1000; // 10 seconds for testing
@@ -27,6 +28,9 @@ export default function AutoMessengerPage() {
   
   const [currentConfig, setCurrentConfig] = React.useState<MessageFormValues | null>(null);
   const [animationTrigger, setAnimationTrigger] = React.useState<'success' | 'none'>('none');
+
+  const [totalSentSuccess, setTotalSentSuccess] = React.useState(0);
+  const [totalSentFailed, setTotalSentFailed] = React.useState(0);
 
   const form = useForm<MessageFormValues>({
     resolver: zodResolver(messageFormSchema),
@@ -53,6 +57,7 @@ export default function AutoMessengerPage() {
           const currentTime = new Date().toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           setLastSentTime(currentTime);
           setAnimationTrigger('success');
+          setTotalSentSuccess(prev => prev + 1);
           toast({
             title: "Сообщение отправлено",
             description: `Сообщение для ${currentConfig.targetBotUsername} успешно отправлено в ${currentTime}.`,
@@ -61,6 +66,7 @@ export default function AutoMessengerPage() {
           const errorMsg = "Не удалось отправить сообщение. Проверьте данные или попробуйте позже.";
           setLastSendError(errorMsg);
           setLastSentTime(null); // Clear last successful send time on error
+          setTotalSentFailed(prev => prev + 1);
           toast({
             title: "Ошибка отправки",
             description: errorMsg,
@@ -91,20 +97,21 @@ export default function AutoMessengerPage() {
     if (isRunning) { // Stop current
       setIsRunning(false);
       setIsSending(false);
-      setCurrentConfig(null);
+      // setCurrentConfig(null); // Keep form filled, messenger is just paused
       toast({ title: "Авто-мессенджер остановлен." });
     } else { // Start new
       setCurrentConfig(data);
       setIsRunning(true);
       setLastSentTime(null);
       setLastSendError(null);
+      // Reset stats for the new session
+      setTotalSentSuccess(0);
+      setTotalSentFailed(0);
       toast({
         title: "Авто-мессенджер запущен!",
         description: `Сообщения для ${data.targetBotUsername} будут отправляться каждые 10 минут.`,
       });
     }
-    // Allow form to be re-enabled or disabled based on isRunning
-    // form.reset(data); // Keep form filled
   }
   
   const getStatusDetails = (): { iconType: StatusIconType; text: string; colorClassName: string } => {
@@ -124,6 +131,14 @@ export default function AutoMessengerPage() {
   };
 
   const statusDetails = getStatusDetails();
+
+  const calculateSuccessRate = () => {
+    const totalAttempts = totalSentSuccess + totalSentFailed;
+    if (totalAttempts === 0) {
+      return 'Н/Д'; // Нет данных / Неприменимо
+    }
+    return `${((totalSentSuccess / totalAttempts) * 100).toFixed(1)}%`;
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-background font-sans">
@@ -192,7 +207,10 @@ export default function AutoMessengerPage() {
           <Separator className="my-8" />
 
           <div className="space-y-4">
-            <h3 className="text-xl font-semibold text-center">Статус Отправки</h3>
+            <h3 className="text-xl font-semibold text-center flex items-center justify-center">
+              <BarChartHorizontalBig className="mr-2 h-6 w-6 text-primary/80" />
+              Статус и Статистика
+            </h3>
             <div className="p-4 border rounded-lg bg-secondary/30 shadow-inner">
               <div className="flex items-center justify-center mb-3">
                  <StatusIndicator 
@@ -212,8 +230,20 @@ export default function AutoMessengerPage() {
                   Детали ошибки: <span className="font-medium">{lastSendError}</span>
                 </p>
               )}
-               {!isRunning && !lastSentTime && !lastSendError && (
+               {!isRunning && !lastSentTime && !lastSendError && (totalSentSuccess === 0 && totalSentFailed === 0) && (
                 <p className="text-sm text-center text-muted-foreground">Сообщения еще не отправлялись.</p>
+              )}
+
+              {(isRunning || totalSentSuccess > 0 || totalSentFailed > 0) && (
+                <>
+                  <Separator className="my-3" />
+                  <h4 className="text-md font-semibold text-center mb-2 text-primary">Статистика Текущей Сессии:</h4>
+                  <div className="text-sm text-center space-y-1 text-muted-foreground">
+                    <p>Успешно отправлено: <span className="font-medium text-green-600">{totalSentSuccess}</span></p>
+                    <p>Ошибок отправки: <span className="font-medium text-destructive">{totalSentFailed}</span></p>
+                    <p>Процент успеха: <span className="font-medium text-primary">{calculateSuccessRate()}</span></p>
+                  </div>
+                </>
               )}
             </div>
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center">
@@ -230,3 +260,4 @@ export default function AutoMessengerPage() {
     </div>
   );
 }
+
