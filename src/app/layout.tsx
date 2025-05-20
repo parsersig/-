@@ -1,25 +1,9 @@
-import type { Metadata } from 'next';
-// import { Geist, Geist_Mono } from 'next/font/google'; // Fonts commented out
-// import './globals.css'; // Still imported, but globals.css is now empty
-// import { Toaster } from "@/components/ui/toaster"; // Toaster commented out
-// import Header from '@/components/layout/header'; // Header commented out
+// import type { Metadata } from 'next'; // Metadata удалена для теста
 
-/*
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
-*/
-
-export const metadata: Metadata = {
-  title: 'Фриланс Ирбит - Найди исполнителя или работу в Ирбите',
-  description: 'Платформа для заказчиков и исполнителей в городе Ирбит. Фриланс Ирбит - размещайте и находите задания легко!',
-};
+// export const metadata: Metadata = { // Metadata удалена для теста
+//   title: 'Фриланс Ирбит - Найди исполнителя или работу в Ирбите',
+//   description: 'Платформа для заказчиков и исполнителей в городе Ирбит. Фриланс Ирбит - размещайте и находите задания легко!',
+// };
 
 export default function RootLayout({
   children,
@@ -28,15 +12,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
-      {/* All classNames removed from body */}
+      {/* Все классы удалены */}
       <body>
-        {/* Header component is commented out */}
-        <main className="flex-grow container mx-auto px-4 py-8">
+        {/* Header и Toaster закомментированы */}
+        {/* <Header /> */}
+        {/* <main className="flex-grow container mx-auto px-4 py-8"> */}
+        <main> {/* Классы удалены для теста */}
           {children}
         </main>
-        {/* Toaster component is commented out */}
-        <footer className="py-6 text-center text-sm text-muted-foreground border-t">
-          © {new Date().getFullYear()} Фриланс Ирбит. Все права защищены.
+        {/* <Toaster /> */}
+        {/* Футер максимально упрощен и стилизован инлайн */}
+        <footer style={{ textAlign: 'center', padding: '20px', borderTop: '1px solid #cccccc', fontSize: '12px', marginTop: '30px' }}>
+          © 2024 Фриланс Ирбит. Все права защищены. (Ультра-минимальный тест)
         </footer>
       </body>
     </html>
