@@ -7,15 +7,11 @@
     "config": "tailwind.config.ts",
     "css": "src/app/globals.css",
     "baseColor": "neutral",
-    "cssVariables": true,
-    "prefix": ""
+    "cssVariables": true
   },
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
-  },
-  "iconLibrary": "lucide"
+    "components": "@/components", // Оставлен базовый alias
+    "utils": "@/lib/utils"      // Оставлен базовый alias
+    // ui, lib, hooks - удалены, так как их структура будет из вашего проекта
+  }
 }
