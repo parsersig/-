@@ -95,21 +95,36 @@ export default function TaskDetailPage() {
       const foundTask = allTasks.find(t => t.id === taskId);
       
       if (foundTask) {
-        const updatedViews = (foundTask.views || 0) + 1;
-        const updatedTask = { ...foundTask, views: updatedViews };
-        setTask(updatedTask);
-
+        // Increment views only if the task is not a placeholder or if it was found in localStorage
+        let isUserTask = false;
         if (storedTasksRaw) {
             try {
                 const userTasks: StoredTask[] = JSON.parse(storedTasksRaw);
-                const taskIndex = userTasks.findIndex(ut => ut.id === taskId);
-                if (taskIndex > -1) {
-                    userTasks[taskIndex].views = updatedViews;
-                    localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(userTasks));
+                isUserTask = userTasks.some(ut => ut.id === taskId);
+            } catch (e) { /* ignore */ }
+        }
+
+        if (isUserTask) {
+            const updatedViews = (foundTask.views || 0) + 1;
+            const updatedTask = { ...foundTask, views: updatedViews };
+            setTask(updatedTask);
+
+            // Update views in localStorage only for user-created tasks
+            if (storedTasksRaw) {
+                try {
+                    const userTasks: StoredTask[] = JSON.parse(storedTasksRaw);
+                    const taskIndex = userTasks.findIndex(ut => ut.id === taskId);
+                    if (taskIndex > -1) {
+                        userTasks[taskIndex].views = updatedViews;
+                        localStorage.setItem(LOCAL_STORAGE_TASKS_KEY, JSON.stringify(userTasks));
+                    }
+                } catch(e) {
+                    console.error("Error updating views in localStorage", e);
                 }
-            } catch(e) {
-                console.error("Error updating views in localStorage", e);
             }
+        } else {
+             // For placeholder tasks, just set them without incrementing views in local storage
+            setTask(foundTask);
         }
       } else {
         setTask(null); 
@@ -120,10 +135,10 @@ export default function TaskDetailPage() {
   const handleRespond = () => {
     if (!task) return;
     toast({
-      title: "Отклик зарегистрирован",
-      description: `Ваш отклик на задание «${task.title}» был успешно зарегистрирован. Заказчик будет уведомлен (демонстрационная функция).`,
+      title: "Отклик принят!",
+      description: `Ваш отклик на задание «${task.title}» зарегистрирован. Заказчик получит уведомление, как только система откликов будет полностью интегрирована.`,
       variant: "default",
-      duration: 6000,
+      duration: 7000,
     });
   };
 
@@ -231,3 +246,5 @@ export default function TaskDetailPage() {
     </div>
   );
 }
+
+    
