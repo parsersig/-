@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
-import './globals.css';
-import { Toaster } from "@/components/ui/toaster";
-import Header from '@/components/layout/header';
+// import { Geist, Geist_Mono } from 'next/font/google'; // Fonts commented out
+// import './globals.css'; // Still imported, but globals.css is now empty
+// import { Toaster } from "@/components/ui/toaster"; // Toaster commented out
+// import Header from '@/components/layout/header'; // Header commented out
 
+/*
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -13,6 +14,7 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
 });
+*/
 
 export const metadata: Metadata = {
   title: 'Фриланс Ирбит - Найди исполнителя или работу в Ирбите',
@@ -26,12 +28,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}>
-        <Header />
+      {/* All classNames removed from body */}
+      <body>
+        {/* Header component is commented out */}
         <main className="flex-grow container mx-auto px-4 py-8">
           {children}
         </main>
-        <Toaster />
+        {/* Toaster component is commented out */}
         <footer className="py-6 text-center text-sm text-muted-foreground border-t">
           © {new Date().getFullYear()} Фриланс Ирбит. Все права защищены.
         </footer>
