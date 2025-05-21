@@ -1,18 +1,25 @@
+// src/app/page.tsx
 "use client";
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // Импортируем useRouter
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Briefcase, Users, Search, FileText, CheckCircle, ArrowRight, TrendingUp, UsersRound, MapPin, Star, Clock, Shield } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { auth } from '@/lib/firebase';
+import { GoogleAuthProvider, signInWithPopup, type UserCredential } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
+
 
 export default function HomePage() {
-  // Добавим анимацию счетчиков
   const [animatedStats, setAnimatedStats] = useState([
     { value: 0, target: 150 },
     { value: 0, target: 300 },
     { value: 0, target: 100 },
   ]);
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -23,9 +30,31 @@ export default function HomePage() {
         }))
       );
     }, 50);
-
     return () => clearInterval(interval);
   }, []);
+
+  const handleLogin = useCallback(async () => {
+    if (!auth) {
+      toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
+      return;
+    }
+    try {
+      const result: UserCredential = await signInWithPopup(auth, new GoogleAuthProvider());
+      toast({ title: "Вход выполнен", description: "Вы успешно вошли в систему." });
+      
+      if (result.additionalUserInfo?.isNewUser) {
+        router.push('/post-registration');
+      }
+    } catch (error: any) {
+      console.error("Firebase login error on HomePage:", error);
+      toast({
+        title: "Ошибка входа",
+        description: error.message || "Не удалось войти через Google. Попробуйте еще раз.",
+        variant: "destructive",
+      });
+    }
+  }, [toast, router]);
+
 
   const features = [
     {
@@ -50,16 +79,15 @@ export default function HomePage() {
     },
   ];
 
-  // Добавим иконки к категориям для визуального улучшения
-  const categories = [
-    { name: "Ремонт и строительство", icon: <Briefcase className="h-5 w-5" /> },
-    { name: "Уборка и помощь по хозяйству", icon: <CheckCircle className="h-5 w-5" /> },
-    { name: "Курьерские услуги", icon: <MapPin className="h-5 w-5" /> },
-    { name: "Компьютерная помощь", icon: <FileText className="h-5 w-5" /> },
-    { name: "Репетиторство и обучение", icon: <Users className="h-5 w-5" /> },
-    { name: "Красота и здоровье", icon: <Star className="h-5 w-5" /> },
-    { name: "Мероприятия и промоакции", icon: <UsersRound className="h-5 w-5" /> },
-    { name: "Фото и видеосъемка", icon: <Search className="h-5 w-5" /> },
+  const categoriesData = [
+    { name: "Ремонт и строительство", icon: Briefcase },
+    { name: "Уборка и помощь по хозяйству", icon: CheckCircle },
+    { name: "Курьерские услуги", icon: MapPin },
+    { name: "Компьютерная помощь", icon: FileText },
+    { name: "Репетиторство и обучение", icon: Users },
+    { name: "Красота и здоровье", icon: Star },
+    { name: "Мероприятия и промоакции", icon: UsersRound },
+    { name: "Фото и видеосъемка", icon: Search },
   ];
 
   const stats = [
@@ -80,7 +108,6 @@ export default function HomePage() {
     },
   ];
 
-  // Добавим отзывы для повышения доверия
   const testimonials = [
     {
       text: "Нашел отличного мастера для ремонта квартиры всего за пару часов. Очень удобный сервис!",
@@ -172,21 +199,24 @@ export default function HomePage() {
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {categories.map((category) => (
-              <Link
-                key={category.name}
-                href={`/tasks?category=${encodeURIComponent(category.name)}`}
-                className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover:scale-105 cursor-pointer group"
-              >
-                <div className="flex items-center mb-2">
-                  <div className="p-2 rounded-full bg-accent/10 text-accent mr-3">
-                    {category.icon}
+            {categoriesData.map((category) => {
+              const IconComponent = category.icon;
+              return (
+                <Link
+                  key={category.name}
+                  href={`/tasks?category=${encodeURIComponent(category.name)}`}
+                  className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover:scale-105 cursor-pointer group"
+                >
+                  <div className="flex items-center mb-2">
+                    <div className="p-2 rounded-full bg-accent/10 text-accent mr-3">
+                      <IconComponent className="h-5 w-5" />
+                    </div>
+                    <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors">{category.name}</h3>
                   </div>
-                  <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors">{category.name}</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">Найти задания в этой категории</p>
-              </Link>
-            ))}
+                  <p className="text-sm text-muted-foreground mt-1">Найти задания в этой категории</p>
+                </Link>
+              );
+            })}
              <Link
                 href="/tasks"
                 className="block p-4 rounded-lg border bg-secondary hover:bg-accent/20 hover:border-accent text-secondary-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover:scale-105 cursor-pointer group flex flex-col items-center justify-center text-center sm:col-span-2 md:col-span-1 lg:col-span-full min-h-[100px]"
@@ -202,124 +232,62 @@ export default function HomePage() {
 
       <section id="how-it-works" className="w-full py-12 md:py-24">
         <div className="container px-4 md:px-6">
-          <div className="text-center mb-12">
-            <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm mb-3">Простой процесс</div>
-            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Как это работает?</h2>
-            <p className="mt-4 max-w-[800px] mx-auto text-muted-foreground md:text-lg">
-              Наша платформа предлагает интуитивно понятный процесс как для заказчиков, так и для исполнителей
-            </p>
-          </div>
+          <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Как это работает?</h2>
           <div className="grid gap-8 md:gap-10 grid-cols-1 md:grid-cols-2">
-            {/* Карточка для заказчиков */}
-            <Card className="overflow-hidden border-accent/10 p-0 shadow-xl hover:shadow-accent/40 transition-all duration-300 hover:scale-105 group">
-              <div className="bg-gradient-to-r from-primary to-primary/80 p-6">
+            <Card className="p-6 shadow-xl hover:shadow-accent/40 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm group">
+              <CardHeader>
                 <div className="flex items-center">
-                  <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full text-white mr-4">
+                  <div className="p-3 rounded-full bg-accent/10 text-accent mr-4 group-hover:scale-110 transition-transform">
                     <Users className="h-8 w-8" />
                   </div>
-                  <CardTitle className="text-2xl sm:text-3xl text-white">Для заказчиков</CardTitle>
+                  <CardTitle className="text-2xl sm:text-3xl">Для заказчиков</CardTitle>
                 </div>
-              </div>
-              <CardContent className="space-y-5 p-6 sm:p-8">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">1</div>
-                  <div>
-                    <h4 className="font-semibold text-lg mb-1">Опубликуйте задание</h4>
-                    <p className="text-muted-foreground">Опишите, что нужно сделать, укажите бюджет и сроки выполнения работы.</p>
+              </CardHeader>
+              <CardContent className="space-y-4 text-muted-foreground">
+                {[
+                  { step: 1, text: "<strong>Опубликуйте задание:</strong> Опишите, что нужно сделать, укажите бюджет." },
+                  { step: 2, text: "<strong>Получайте отклики:</strong> Исполнители из Ирбита предложат свои услуги." },
+                  { step: 3, text: "<strong>Выберите лучшего:</strong> Свяжитесь с подходящим исполнителем и договоритесь." }
+                ].map(item => (
+                  <div key={item.step} className="flex items-start">
+                    <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground mr-3 text-sm font-bold group-hover:scale-110 transition-transform">{item.step}</span>
+                    <p dangerouslySetInnerHTML={{ __html: item.text }} />
                   </div>
-                </div>
-                
-                <div className="w-full border-t border-border my-2 opacity-30" />
-                
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">2</div>
-                  <div>
-                    <h4 className="font-semibold text-lg mb-1">Получайте отклики</h4>
-                    <p className="text-muted-foreground">Исполнители из Ирбита предложат свои услуги и цены на выполнение.</p>
-                  </div>
-                </div>
-                
-                <div className="w-full border-t border-border my-2 opacity-30" />
-                
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">3</div>
-                  <div>
-                    <h4 className="font-semibold text-lg mb-1">Выберите лучшего</h4>
-                    <p className="text-muted-foreground">Свяжитесь с подходящим исполнителем, обсудите детали и получите результат.</p>
-                  </div>
-                </div>
-                
-                <div className="mt-8 relative">
-                  <Button asChild size="lg" className="w-full py-6 shadow-lg font-semibold">
-                    <Link href="/create-task">
-                      Разместить задание 
-                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                  </Button>
-                  <div className="absolute -right-2 -top-2 bg-accent text-accent-foreground text-xs font-medium px-2 py-1 rounded animate-pulse">
-                    Бесплатно
-                  </div>
-                </div>
+                ))}
+                <Button asChild size="lg" className="mt-6 w-full hover-scale">
+                  <Link href="/create-task">Разместить задание <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"/></Link>
+                </Button>
               </CardContent>
             </Card>
-            
-            {/* Карточка для исполнителей */}
-            <Card className="overflow-hidden border-accent/10 p-0 shadow-xl hover:shadow-accent/40 transition-all duration-300 hover:scale-105 group">
-              <div className="bg-gradient-to-r from-accent to-accent/80 p-6">
+            <Card className="p-6 shadow-xl hover:shadow-accent/40 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm group">
+              <CardHeader>
                 <div className="flex items-center">
-                  <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full text-white mr-4">
+                   <div className="p-3 rounded-full bg-accent/10 text-accent mr-4 group-hover:scale-110 transition-transform">
                     <Briefcase className="h-8 w-8" />
                   </div>
-                  <CardTitle className="text-2xl sm:text-3xl text-white">Для исполнителей</CardTitle>
+                  <CardTitle className="text-2xl sm:text-3xl">Для исполнителей</CardTitle>
                 </div>
-              </div>
-              <CardContent className="space-y-5 p-6 sm:p-8">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-accent text-accent-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">1</div>
-                  <div>
-                    <h4 className="font-semibold text-lg mb-1">Найдите задания</h4>
-                    <p className="text-muted-foreground">Просматривайте новые заказы в Ирбите по вашей специализации и опыту.</p>
+              </CardHeader>
+              <CardContent className="space-y-4 text-muted-foreground">
+                 {[
+                  { step: 1, text: "<strong>Найдите задания:</strong> Просматривайте новые заказы в Ирбите по вашей специализации." },
+                  { step: 2, text: "<strong>Предложите услуги:</strong> Откликайтесь на интересные задания, указывайте свою цену." },
+                  { step: 3, text: "<strong>Выполняйте и зарабатывайте:</strong> Договаривайтесь с заказчиками и получайте оплату." }
+                ].map(item => (
+                  <div key={item.step} className="flex items-start">
+                    <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground mr-3 text-sm font-bold group-hover:scale-110 transition-transform">{item.step}</span>
+                    <p dangerouslySetInnerHTML={{ __html: item.text }} />
                   </div>
-                </div>
-                
-                <div className="w-full border-t border-border my-2 opacity-30" />
-                
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-accent text-accent-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">2</div>
-                  <div>
-                    <h4 className="font-semibold text-lg mb-1">Предложите услуги</h4>
-                    <p className="text-muted-foreground">Откликайтесь на интересные задания, указывайте свою цену и сроки выполнения.</p>
-                  </div>
-                </div>
-                
-                <div className="w-full border-t border-border my-2 opacity-30" />
-                
-                <div className="flex items-start">
-                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-accent text-accent-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">3</div>
-                  <div>
-                    <h4 className="font-semibold text-lg mb-1">Выполняйте и зарабатывайте</h4>
-                    <p className="text-muted-foreground">Договаривайтесь с заказчиками, выполняйте работу и получайте оплату.</p>
-                  </div>
-                </div>
-                
-                <div className="mt-8 relative">
-                  <Button asChild size="lg" variant="outline" className="w-full py-6 border-accent text-accent hover:bg-accent/10 font-semibold">
-                    <Link href="/tasks">
-                      Найти задания
-                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                  </Button>
-                  <div className="absolute -right-2 -top-2 bg-primary text-primary-foreground text-xs font-medium px-2 py-1 rounded animate-pulse">
-                    Начните сейчас
-                  </div>
-                </div>
+                ))}
+                <Button asChild size="lg" className="mt-6 w-full hover-scale">
+                  <Link href="/tasks">Найти задания <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"/></Link>
+                </Button>
               </CardContent>
             </Card>
           </div>
         </div>
       </section>
 
-      {/* Раздел с отзывами */}
       <section id="testimonials" className="w-full py-12 md:py-24 bg-muted/30">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
@@ -349,7 +317,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Призыв к действию в конце */}
       <section className="w-full py-12 md:py-16 bg-accent/10">
         <div className="container px-4 md:px-6 text-center">
           <div className="flex flex-col items-center max-w-3xl mx-auto">
@@ -358,8 +325,8 @@ export default function HomePage() {
               Присоединяйтесь к растущему сообществу фрилансеров и заказчиков в Ирбите уже сегодня!
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button asChild size="lg" className="shadow-lg hover:scale-105 transition-transform">
-                <Link href="/register">Зарегистрироваться</Link>
+              <Button size="lg" className="shadow-lg hover:scale-105 transition-transform" onClick={handleLogin}>
+                Зарегистрироваться
               </Button>
               <Button asChild variant="outline" size="lg" className="shadow-lg hover:scale-105 transition-transform">
                 <Link href="/tasks">Посмотреть задания</Link>
@@ -369,7 +336,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Блок с преимуществами безопасности */}
       <section className="w-full py-12 md:py-20">
         <div className="container px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
@@ -406,3 +372,4 @@ export default function HomePage() {
     </div>
   );
 }
+

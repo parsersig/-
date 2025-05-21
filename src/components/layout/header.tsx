@@ -1,6 +1,8 @@
+// src/components/layout/header.tsx
 "use client";
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // Импортируем useRouter
 import { Button } from '@/components/ui/button';
 import {
   Briefcase,
@@ -15,16 +17,20 @@ import {
   Search,
   LogIn,
   UserPlus,
-  FileText
+  FileTextIcon
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Sheet,
   SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
   SheetTrigger,
   SheetClose,
 } from "@/components/ui/sheet";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase'; // Убедимся, что db импортирован, если нужен для других целей
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
 
 interface NavLink {
@@ -44,7 +50,6 @@ interface NavLink {
   icon: LucideIcon;
 }
 
-// Кэшированные навигационные ссылки, вынесенные за пределы компонента
 const mainNavLinks: NavLink[] = [
   { href: "/tasks", label: "Найти задания", icon: Search },
   { href: "/create-task", label: "Создать задание", icon: FilePlus2 },
@@ -53,7 +58,7 @@ const mainNavLinks: NavLink[] = [
 const userMenuLinks: NavLink[] = [
   { href: "/profile", label: "Мой профиль", icon: UserCircle },
   { href: "/my-tasks", label: "Мои задания", icon: ListChecks },
-  { href: "/my-responses", label: "Мои отклики", icon: FileText },
+  { href: "/my-responses", label: "Мои отклики", icon: FileTextIcon },
   { href: "/messages", label: "Сообщения", icon: MessageSquare },
   { href: "/notifications", label: "Уведомления", icon: Bell },
 ];
@@ -63,10 +68,11 @@ export default function Header() {
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const router = useRouter(); // Инициализируем router
 
   useEffect(() => {
     if (!auth) {
-      console.warn("Firebase Auth service is not available. Login/Logout will not work.");
+      console.warn("[Header Auth] Firebase Auth service is not available.");
       setIsLoadingAuth(false);
       return;
     }
@@ -89,9 +95,13 @@ export default function Header() {
     }
     setIsLoadingAuth(true);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
       toast({ title: "Вход выполнен", description: "Вы успешно вошли в систему." });
       setIsMobileMenuOpen(false);
+      // Проверяем, новый ли это пользователь
+      if (result.additionalUserInfo?.isNewUser) {
+        router.push('/post-registration'); // Перенаправляем на новую страницу
+      }
     } catch (error: any) {
       console.error("Firebase login error:", error);
       toast({
@@ -100,16 +110,16 @@ export default function Header() {
         variant: "destructive",
       });
     } finally {
-      setIsLoadingAuth(false);
+      // setIsLoadingAuth(false); // Это уже делается в onAuthStateChanged
     }
-  }, [toast]);
+  }, [toast, router]);
 
   const handleLogout = useCallback(async () => {
     if (!auth) {
       toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
       return;
     }
-    setIsLoadingAuth(true);
+    // setIsLoadingAuth(true); // Не обязательно здесь, т.к. onAuthStateChanged отреагирует
     try {
       await signOut(auth);
       toast({ title: "Выход выполнен", description: "Вы успешно вышли из системы." });
@@ -122,10 +132,10 @@ export default function Header() {
         variant: "destructive",
       });
     } finally {
-      setIsLoadingAuth(false);
+      // setIsLoadingAuth(false); // Это уже делается в onAuthStateChanged
     }
   }, [toast]);
-
+  
   if (isLoadingAuth) {
     return (
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
@@ -144,8 +154,10 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="container flex h-16 items-center">
         <Link href="/" className="mr-auto flex items-center space-x-2">
-          <Briefcase className="h-7 w-7 text-accent" />
-          <span className="font-bold text-lg sm:text-xl">Фриланс Ирбит</span>
+          <span className="flex items-center space-x-2">
+            <Briefcase className="h-7 w-7 text-accent" />
+            <span className="font-bold text-lg sm:text-xl">Фриланс Ирбит</span>
+          </span>
         </Link>
 
         <nav className="hidden md:flex items-center space-x-1 sm:space-x-2">
@@ -164,7 +176,7 @@ export default function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full" aria-label="Меню пользователя">
                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="user avatar"/>
+                    <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} />
                     <AvatarFallback>
                       {user.displayName ? user.displayName.substring(0, 1).toUpperCase() : <UserCircle className="h-6 w-6" />}
                     </AvatarFallback>
@@ -223,12 +235,24 @@ export default function Header() {
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] sm:w-[320px] pt-10 px-4">
-              <nav className="flex flex-col space-y-2">
+            <SheetContent 
+              side="right" 
+              className="w-[280px] sm:w-[320px] pt-10 px-4"
+              aria-labelledby="mobile-menu-title"
+              aria-describedby="mobile-menu-description"
+            >
+              <SheetHeader>
+                <VisuallyHidden>
+                  <SheetTitle id="mobile-menu-title">Главное меню навигации</SheetTitle>
+                  <SheetDescription id="mobile-menu-description">Выберите раздел сайта Фриланс Ирбит.</SheetDescription>
+                </VisuallyHidden>
+              </SheetHeader>
+              <nav className="flex flex-col space-y-2 mt-4"> {/* Добавлен mt-4 для отступа от скрытого заголовка */}
                 <SheetClose asChild>
                   <Link 
                     href="/"
                     className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50"
+                    onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <Home className="mr-3 h-6 w-6 text-accent/80" /> Главная
                   </Link>
@@ -241,6 +265,7 @@ export default function Header() {
                       <Link 
                         href={link.href}
                         className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50"
+                        onClick={() => setIsMobileMenuOpen(false)}
                       >
                         <IconComponent className="mr-3 h-6 w-6 text-accent/80" />
                         {link.label}
@@ -260,6 +285,7 @@ export default function Header() {
                           <Link 
                             href={link.href}
                             className="flex items-center text-lg font-medium text-foreground transition-colors hover:text-accent p-3 rounded-md hover:bg-muted/50"
+                            onClick={() => setIsMobileMenuOpen(false)}
                           >
                             <IconComponent className="mr-3 h-6 w-6 text-accent/80" />
                             {link.label}
