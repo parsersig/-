@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { collection, query, where, getDocs, orderBy, Timestamp, FirestoreError } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, Timestamp, type FirestoreError } from "firebase/firestore";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Обновим интерфейс ResponseData, чтобы включить необходимые поля
@@ -17,10 +18,10 @@ interface ResponseData {
   taskTitle: string;
   taskCategory: string;
   responderId: string;
-  respondedAt: string;
-  firestoreRespondedAt: Timestamp | string | Date;
+  respondedAt: string; // Уже отформатированная дата
+  firestoreRespondedAt: Timestamp | string | Date; // Для сортировки, если нужно
   status?: string;
-  responseMessage?: string; // Делаем поле опциональным
+  responseMessage?: string; 
 }
 
 const formatDate = (date: any): string => {
@@ -28,7 +29,7 @@ const formatDate = (date: any): string => {
   if (date instanceof Timestamp) {
     return date.toDate().toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
-  if (typeof date === 'string') {
+  if (typeof date === 'string' || typeof date === 'number') {
     const parsedDate = new Date(date);
     if (!isNaN(parsedDate.getTime())) {
       return parsedDate.toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -45,7 +46,12 @@ export default function MyResponsesPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = auth?.onAuthStateChanged(currentUser => {
+    if (!auth) {
+      setIsLoadingAuth(false);
+      setIsLoadingResponses(false);
+      return;
+    }
+    const unsubscribe = auth.onAuthStateChanged(currentUser => {
       setUser(currentUser);
       setIsLoadingAuth(false);
       if (currentUser && db) {
@@ -56,10 +62,10 @@ export default function MyResponsesPage() {
       }
     });
     
-    return () => unsubscribe?.();
+    return () => unsubscribe();
   }, []);
 
-  const fetchUserResponses = async (userId: string) => {
+  const fetchUserResponses = async (userId: string, attemptFallback = true) => {
     if (!db) {
       console.error("Firestore (db) is not initialized. Cannot fetch responses.");
       setError("База данных не инициализирована. Попробуйте перезагрузить страницу.");
@@ -69,18 +75,23 @@ export default function MyResponsesPage() {
     
     setIsLoadingResponses(true);
     setError(null);
+    setUserResponses([]); // Очищаем предыдущие результаты перед новым запросом
     
     try {
-      // Попробуем запрос с составным индексом
+      console.log(`Fetching responses for userId: ${userId}, attemptFallback: ${attemptFallback}`);
       const responsesRef = collection(db, "responses");
       
-      // Используем оригинальный запрос
-      const q = query(
-        responsesRef, 
-        where("responderId", "==", userId), 
-        orderBy("respondedAt", "desc")
-      );
-      
+      const q = attemptFallback 
+        ? query(
+            responsesRef, 
+            where("responderId", "==", userId), 
+            orderBy("respondedAt", "desc")
+          )
+        : query( // Запрос без orderBy для фоллбэка
+            responsesRef,
+            where("responderId", "==", userId)
+          );
+          
       const querySnapshot = await getDocs(q);
       const responses: ResponseData[] = [];
       
@@ -90,77 +101,52 @@ export default function MyResponsesPage() {
           id: doc.id,
           taskId: data.taskId,
           taskTitle: data.taskTitle,
-          taskCategory: data.taskCategory,
+          taskCategory: data.taskCategory, // Убедимся, что это поле есть в данных отклика
           responderId: data.responderId,
-          respondedAt: formatDate(data.respondedAt),
-          firestoreRespondedAt: data.respondedAt,
+          respondedAt: formatDate(data.respondedAt), // Форматируем дату сразу
+          firestoreRespondedAt: data.respondedAt, // Сохраняем оригинал для возможной сортировки на клиенте
           status: data.status,
           responseMessage: data.responseMessage || data.message || data.comment // Учитываем разные возможные имена поля
         });
       });
       
+      // Если основной запрос (с orderBy) не удался и мы использовали фоллбэк без сортировки,
+      // то сортируем на клиенте.
+      if (!attemptFallback && responses.length > 0) {
+        responses.sort((a, b) => {
+          const dateA = a.firestoreRespondedAt instanceof Timestamp 
+            ? a.firestoreRespondedAt.toMillis() 
+            : new Date(a.firestoreRespondedAt as any).getTime();
+          const dateB = b.firestoreRespondedAt instanceof Timestamp 
+            ? b.firestoreRespondedAt.toMillis() 
+            : new Date(b.firestoreRespondedAt as any).getTime();
+          return dateB - dateA;
+        });
+      }
+      
       setUserResponses(responses);
       
-    } catch (error) {
-      console.error("Error fetching user responses:", error);
+    } catch (err: any) {
+      const firestoreError = err as FirestoreError;
+      console.error("Error fetching user responses:", firestoreError);
       
-      // Проверяем, является ли ошибка проблемой с индексом
-      if (
-        error instanceof FirestoreError && 
-        error.code === 'failed-precondition' && 
-        error.message.includes('index')
-      ) {
-        setError("Требуется создание индекса в Firebase. Пожалуйста, сообщите администратору.");
-        
-        // Попробуем альтернативный запрос без составного индекса
-        try {
-          const simpleQuery = query(
-            collection(db, "responses"), 
-            where("responderId", "==", userId)
-          );
-          
-          const fallbackSnapshot = await getDocs(simpleQuery);
-          const fallbackResponses: ResponseData[] = [];
-          
-          fallbackSnapshot.forEach((doc) => {
-            const data = doc.data();
-            fallbackResponses.push({
-              id: doc.id,
-              taskId: data.taskId,
-              taskTitle: data.taskTitle,
-              taskCategory: data.taskCategory,
-              responderId: data.responderId,
-              respondedAt: formatDate(data.respondedAt),
-              firestoreRespondedAt: data.respondedAt,
-              status: data.status,
-              responseMessage: data.responseMessage || data.message || data.comment
-            });
-          });
-          
-          // Сортируем на клиенте, так как не можем использовать orderBy
-          fallbackResponses.sort((a, b) => {
-            const dateA = a.firestoreRespondedAt instanceof Timestamp 
-              ? a.firestoreRespondedAt.toMillis() 
-              : new Date(a.firestoreRespondedAt as any).getTime();
-              
-            const dateB = b.firestoreRespondedAt instanceof Timestamp 
-              ? b.firestoreRespondedAt.toMillis() 
-              : new Date(b.firestoreRespondedAt as any).getTime();
-            
-            return dateB - dateA; // Сортировка от новых к старым
-          });
-          
-          setUserResponses(fallbackResponses);
-          setError("Данные загружены в ограниченном режиме. Сортировка может быть некорректной.");
-          
-        } catch (fallbackError) {
-          console.error("Error in fallback query:", fallbackError);
-        }
+      if (attemptFallback && firestoreError.code === 'failed-precondition' && firestoreError.message.includes('index')) {
+        setError("Для корректной сортировки откликов требуется создание индекса в Firebase. Пытаюсь загрузить данные без сортировки...");
+        // Попытка загрузить данные без сортировки (без orderBy)
+        fetchUserResponses(userId, false); // Вызываем эту же функцию, но с флагом attemptFallback = false
+        return; // Выходим, чтобы не вызывать setIsLoadingResponses(false) дважды
+      } else if (!attemptFallback && firestoreError.code === 'failed-precondition') {
+        // Ошибка даже при фоллбэк запросе, вероятно, проблема с where("responderId", ...)
+         setError(`Ошибка загрузки данных: ${firestoreError.message}. Возможно, требуется другой индекс.`);
       } else {
-        setError("Произошла ошибка при загрузке данных. Попробуйте позже.");
+        setError(`Произошла ошибка при загрузке откликов: ${firestoreError.message || 'Неизвестная ошибка'}`);
       }
     } finally {
-      setIsLoadingResponses(false);
+        // Устанавливаем isLoadingResponses в false только если это был не первый (основной) вызов, который рекурсивно вызвал фоллбэк
+        // Или если это был фоллбэк вызов.
+        if (!attemptFallback || (attemptFallback && !(firestoreError?.code === 'failed-precondition' && firestoreError?.message.includes('index')))) {
+             setIsLoadingResponses(false);
+        }
     }
   };
 
@@ -187,7 +173,7 @@ export default function MyResponsesPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-6">Для доступа к этой странице необходимо войти в систему.</p>
-            <Button size="lg" asChild className="hover:scale-105 transition-transform">
+            <Button size="lg" asChild className="hover-scale">
               <Link href="/">На главную</Link>
             </Button>
           </CardContent>
@@ -220,7 +206,7 @@ export default function MyResponsesPage() {
       {error && (
         <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Внимание</AlertTitle>
+          <AlertTitle>Ошибка загрузки</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -228,13 +214,13 @@ export default function MyResponsesPage() {
       {userResponses.length > 0 ? (
         <div className="space-y-4 sm:space-y-6">
           {userResponses.map((response) => (
-            <Card key={response.id} className="shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover:translate-y-[-2px] transition-transform bg-card/80 backdrop-blur-sm">
+            <Card key={response.id} className="shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/80 backdrop-blur-sm">
               <CardHeader className="pb-2 sm:pb-3">
                 <Link href={`/tasks/${response.taskId}`} className="hover:text-accent transition-colors">
                   <CardTitle className="text-lg sm:text-xl">{response.taskTitle}</CardTitle>
                 </Link>
                 <CardDescription className="text-xs sm:text-sm text-muted-foreground flex items-center pt-1">
-                  <Briefcase className="h-4 w-4 mr-1.5 text-accent/80" /> Категория: {response.taskCategory}
+                  <Briefcase className="h-4 w-4 mr-1.5 text-accent/80" /> Категория: {response.taskCategory || "Не указана"}
                 </CardDescription>
               </CardHeader>
               {response.responseMessage && (
@@ -250,7 +236,7 @@ export default function MyResponsesPage() {
                   <CalendarCheck2 className="h-4 w-4 mr-1.5 text-accent/70" />
                   Отклик оставлен: {response.respondedAt}
                 </span>
-                <Button variant="outline" size="sm" asChild className="hover:scale-105 transition-transform text-xs px-3">
+                <Button variant="outline" size="sm" asChild className="hover-scale text-xs px-3">
                   <Link href={`/tasks/${response.taskId}`}>
                     <ExternalLink className="h-3 w-3 mr-1.5" />
                     К заданию
@@ -261,15 +247,19 @@ export default function MyResponsesPage() {
           ))}
         </div>
       ) : (
-        <Card className="shadow-xl bg-card/70 backdrop-blur-sm p-6 sm:p-8 text-center">
-           <ListFilter className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mb-4" />
-          <h3 className="text-xl sm:text-2xl font-semibold mb-2">У вас пока нет откликов</h3>
-          <p className="text-muted-foreground mb-6">Найдите интересные задания и откликайтесь на них!</p>
-          <Button size="lg" asChild className="hover:scale-105 transition-transform">
-            <Link href="/tasks">Найти задания</Link>
-          </Button>
-        </Card>
+        !error && ( // Показываем "нет откликов" только если нет активной ошибки
+          <Card className="shadow-xl bg-card/70 backdrop-blur-sm p-6 sm:p-8 text-center">
+            <ListFilter className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mb-4" />
+            <h3 className="text-xl sm:text-2xl font-semibold mb-2">У вас пока нет откликов</h3>
+            <p className="text-muted-foreground mb-6">Найдите интересные задания и откликайтесь на них!</p>
+            <Button size="lg" asChild className="hover-scale">
+              <Link href="/tasks">Найти задания</Link>
+            </Button>
+          </Card>
+        )
       )}
     </div>
   );
 }
+
+    
