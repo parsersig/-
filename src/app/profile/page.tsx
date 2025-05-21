@@ -1,50 +1,25 @@
+// src/app/profile/page.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  UserCircle, 
-  LogIn, 
-  Edit, 
-  Mail, 
-  ShieldCheck, 
-  CalendarDays, 
-  Briefcase, 
-  Star, 
-  TrendingUp, 
-  MessageSquare, 
-  Clock,
-  CheckCircle2,
-  Phone,
-  CircleUserRound,
-  ListChecks
-} from "lucide-react";
+import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, MessageSquare, Clock, ListChecks } from "lucide-react"; // Added Clock, ListChecks
 import { useState, useEffect } from 'react';
 import { auth } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Select, 
-  SelectContent, 
-  SelectGroup, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [reviewFilter, setReviewFilter] = useState("positive");
 
   useEffect(() => {
     if (!auth) {
-      console.warn("Firebase auth instance is not available in ProfilePage.");
-      setIsLoadingAuth(false);
-      return;
+        console.warn("Firebase auth instance is not available in ProfilePage.");
+        setIsLoadingAuth(false);
+        return;
     }
     const unsubscribe = auth.onAuthStateChanged(currentUser => {
       setUser(currentUser);
@@ -76,7 +51,7 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-6">Для доступа к этой странице необходимо войти в систему.</p>
-            <Button size="lg" asChild className="hover:scale-105 transition-transform">
+            <Button size="lg" asChild className="hover-scale">
                 <Link href="/">На главную</Link>
             </Button>
           </CardContent>
@@ -88,38 +63,10 @@ export default function ProfilePage() {
   const registrationDate = user.metadata.creationTime 
     ? new Date(user.metadata.creationTime).toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' }) 
     : "Неизвестно";
-
-  const mockReviews = [
-    {
-      id: 1,
-      date: "2 апреля 2025",
-      taskName: "Сделать по образцу 4 макета для контекстной рекламы",
-      reviewerName: "Екатерина С.",
-      comment: "Заказчик была на связи во время выполнения задания, оперативно приняла результат. Буду рада помочь еще!)",
-      rating: 5,
-      type: "positive"
-    },
-    {
-      id: 2,
-      date: "15 марта 2025",
-      taskName: "Разработка дизайна визитки для компании",
-      reviewerName: "Алексей М.",
-      comment: "Четкое ТЗ, быстрая оплата, приятно сотрудничать!",
-      rating: 5,
-      type: "positive"
-    },
-    {
-      id: 3,
-      date: "27 февраля 2025",
-      taskName: "Верстка лендинга по макету из Figma",
-      reviewerName: "Сергей К.",
-      comment: "Отличный заказчик, все четко и по делу. Рекомендую!",
-      rating: 5,
-      type: "positive"
-    }
-  ];
-
-  const filteredReviews = mockReviews.filter(review => review.type === reviewFilter);
+  
+  const lastSignInDate = user.metadata.lastSignInTime
+    ? new Date(user.metadata.lastSignInTime).toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : "Недавно";
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8 pb-10">
@@ -132,142 +79,83 @@ export default function ProfilePage() {
                 {user.displayName ? user.displayName.charAt(0).toUpperCase() : <UserCircle className="h-16 w-16"/>}
               </AvatarFallback>
             </Avatar>
-            <Button variant="outline" size="icon" className="absolute bottom-2 right-2 h-9 w-9 rounded-full bg-background hover:bg-accent/10 border-accent text-accent hover:text-accent shadow-md">
+            <Button variant="outline" size="icon" className="absolute bottom-1 right-1 h-8 w-8 rounded-full bg-background hover:bg-accent/10 border-accent/50 text-accent hover:text-accent shadow-md" title="Редактировать фото (в разработке)">
               <Edit className="h-4 w-4" />
               <span className="sr-only">Редактировать фото</span>
             </Button>
           </div>
-          <CardTitle className="text-2xl sm:text-3xl font-bold">{user.displayName || "Екатерина Н."}</CardTitle>
-          <CardDescription className="text-md text-muted-foreground pt-1">38 лет, Москва</CardDescription> 
-          <div className="flex flex-wrap gap-2 mt-3 justify-center">
-            <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30">Исполнитель</Badge>
-            <Badge variant="secondary" className="bg-blue-500/20 text-blue-400 border-blue-500/30">Проверенный аккаунт</Badge>
+          <CardTitle className="text-2xl sm:text-3xl font-bold">{user.displayName || "Пользователь"}</CardTitle>
+          <CardDescription className="text-md text-muted-foreground pt-1">Ирбит, Россия (заглушка) • 38 лет (заглушка)</CardDescription> 
+          <div className="flex flex-wrap gap-2 mt-4 justify-center">
+            <Badge variant="secondary" className="text-sm py-1 px-3 bg-green-600/20 text-green-400 border-green-500/40">Исполнитель (статус)</Badge>
+            <Badge variant="secondary" className="text-sm py-1 px-3 bg-blue-600/20 text-blue-400 border-blue-500/40">Проверен (статус)</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-6 sm:p-8 space-y-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-center">
-            <div className="bg-muted/30 rounded-lg p-4 flex flex-col items-center">
-              <p className="text-3xl font-bold text-accent">34</p>
-              <p className="text-sm text-muted-foreground">заданий создано</p>
-            </div>
-            <div className="bg-muted/30 rounded-lg p-4 flex flex-col items-center">
-              <p className="text-3xl font-bold text-accent">0</p>
-              <p className="text-sm text-muted-foreground">заданий выполнено</p>
-            </div>
-            <div className="bg-muted/30 rounded-lg p-4 flex flex-col items-center col-span-2 sm:col-span-1">
-              <div className="flex items-center justify-center">
-                <p className="text-3xl font-bold text-accent mr-2">5.0</p>
-                <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-              </div>
-              <p className="text-sm text-muted-foreground">8 отзывов</p>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold mb-2 text-foreground/90 flex items-center">
-              <UserCircle className="h-5 w-5 mr-2 text-accent/80"/>Основная информация
-            </h3>
-            <div className="space-y-2 text-sm text-muted-foreground pl-7">
-              <p className="flex items-center">
-                <Mail className="h-4 w-4 mr-2 text-accent/70" />
-                Email: {user.email || "example@mail.ru"} 
-                {user.emailVerified && <ShieldCheck className="h-4 w-4 ml-1.5 text-green-500" title="Email подтвержден" />}
-              </p>
-              <p className="flex items-center">
-                <Phone className="h-4 w-4 mr-2 text-accent/70" />
-                Телефон: +7 (XXX) XXX-XX-XX <ShieldCheck className="h-4 w-4 ml-1.5 text-green-500" title="Телефон подтвержден" />
-              </p>
-              <p className="flex items-center">
-                <CircleUserRound className="h-4 w-4 mr-2 text-accent/70" />
-                Соцсеть: <span className="ml-1">Подтверждена</span> <ShieldCheck className="h-4 w-4 ml-1.5 text-green-500" title="Соцсеть подтверждена" />
-              </p>
-              <p className="flex items-center">
-                <CalendarDays className="h-4 w-4 mr-2 text-accent/70" />
-                Дата регистрации: {registrationDate}
-              </p>
-              <p className="flex items-center">
-                <Clock className="h-4 w-4 mr-2 text-accent/70" />
-                Была на сайте: 21 мая 2025
-              </p>
-            </div>
-          </div>
-
-          <div className="border-t pt-5">
-            <h3 className="text-lg font-semibold mb-4 text-foreground/90 flex items-center">
-              <Star className="h-5 w-5 mr-2 text-accent/80"/>Отзывы и рейтинг
-            </h3>
-            <div className="pl-7 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="flex text-yellow-400">
-                    {[...Array(5)].map((_, i) => <Star key={i} className="h-5 w-5 fill-current" />)}
-                  </div>
-                  <span className="font-medium">Средняя оценка 5.0</span>
-                </div>
-                <Select value={reviewFilter} onValueChange={setReviewFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Фильтр отзывов" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="positive">Положительные (8)</SelectItem>
-                      <SelectItem value="negative">Отрицательные (0)</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-4">
-                {filteredReviews.length > 0 ? (
-                  filteredReviews.map(review => (
-                    <Card key={review.id} className="p-4 bg-muted/30">
-                      <div className="flex justify-between items-start mb-2">
-                        <p className="font-semibold">{review.date}</p>
-                        <div className="flex text-yellow-400">
-                          {[...Array(review.rating)].map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
-                        </div>
-                      </div>
-                      <p className="text-sm font-medium mb-2">Задание «{review.taskName}» выполнено</p>
-                      <p className="text-sm italic mb-2">"{review.comment}"</p>
-                      <p className="text-xs text-muted-foreground">Исполнитель {review.reviewerName}</p>
-                    </Card>
-                  ))
-                ) : (
-                  <p className="text-center text-muted-foreground py-4">Отзывов данного типа пока нет</p>
-                )}
-              </div>
-            </div>
-          </div>
           
-          <div className="border-t pt-5">
-            <h3 className="text-lg font-semibold mb-2 text-foreground/90 flex items-center">
-              <Briefcase className="h-5 w-5 mr-2 text-accent/80"/>О себе
-            </h3>
-            <div className="pl-7 bg-muted/20 p-4 rounded-lg">
-              <p className="text-sm">
-                Опыт работы в графическом дизайне более 10 лет. Специализируюсь на создании рекламных 
-                материалов, логотипов и брендбуков. Работаю быстро и качественно, всегда соблюдаю дедлайны. 
-                Готова к сотрудничеству как с частными лицами, так и с компаниями.
-              </p>
+          <section>
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><UserCircle className="h-6 w-6 mr-2.5 text-accent"/>Основная информация</h3>
+            <div className="space-y-2 text-sm text-muted-foreground pl-8">
+              <p className="flex items-center"><Mail className="h-4 w-4 mr-2.5 text-accent/80" />Email: <span className="ml-1 font-medium text-foreground/90">{user.email || "Не указан"}</span> {user.emailVerified && <ShieldCheck className="h-4 w-4 ml-2 text-green-400" title="Email подтвержден" />}</p>
+              <p className="flex items-center"><CalendarDays className="h-4 w-4 mr-2.5 text-accent/80" />Дата регистрации: <span className="ml-1 font-medium text-foreground/90">{registrationDate}</span></p>
+              <p className="flex items-center"><Clock className="h-4 w-4 mr-2.5 text-accent/80" />Был(а) на сайте: <span className="ml-1 font-medium text-foreground/90">{lastSignInDate} (реально)</span></p>
+              <p className="text-xs mt-1">Подтверждения: Email, Телефон, Соцсеть (заглушка)</p>
             </div>
-          </div>
+          </section>
 
-          <div className="border-t pt-5">
-            <h3 className="text-lg font-semibold mb-2 text-foreground/90 flex items-center">
-              <ListChecks className="h-5 w-5 mr-2 text-accent/80"/>Специализации
-            </h3>
-            <div className="pl-7 flex flex-wrap gap-2">
-              <Badge variant="outline" className="bg-muted/20">Графический дизайн</Badge>
-              <Badge variant="outline" className="bg-muted/20">Разработка логотипов</Badge>
-              <Badge variant="outline" className="bg-muted/20">Брендинг</Badge>
-              <Badge variant="outline" className="bg-muted/20">Дизайн рекламы</Badge>
-              <Badge variant="outline" className="bg-muted/20">Веб-дизайн</Badge>
+           <section>
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><TrendingUp className="h-6 w-6 mr-2.5 text-accent"/>Статистика (заглушка)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center pl-8">
+                <Card className="p-4 bg-muted/40 rounded-lg shadow">
+                    <p className="text-3xl font-bold text-accent">34</p>
+                    <p className="text-xs text-muted-foreground mt-1">заданий создано</p>
+                </Card>
+                <Card className="p-4 bg-muted/40 rounded-lg shadow">
+                    <p className="text-3xl font-bold text-accent">0</p>
+                    <p className="text-xs text-muted-foreground mt-1">заданий выполнено</p>
+                </Card>
             </div>
-          </div>
+          </section>
+
+          <section>
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><Star className="h-6 w-6 mr-2.5 text-accent"/>Рейтинг и Отзывы (заглушка)</h3>
+            <div className="pl-8 space-y-4">
+              <div className="flex items-baseline space-x-2">
+                <div className="flex text-yellow-400">
+                    {[...Array(5)].map((_, i) => <Star key={i} className="h-6 w-6 fill-current" />)}
+                </div>
+                <span className="text-muted-foreground text-lg font-semibold">5.0</span>
+                <span className="text-sm text-muted-foreground">(8 отзывов)</span>
+              </div>
+              <div className="space-x-2">
+                <Button variant="outline" size="sm" className="text-xs">Положительные (8)</Button>
+                <Button variant="outline" size="sm" className="text-xs">Отрицательные (0)</Button>
+              </div>
+              <Card className="p-4 bg-muted/40 rounded-lg shadow">
+                <div className="flex justify-between items-start mb-1">
+                    <p className="text-sm font-semibold text-foreground/90">Задание «Сделать по образцу 4 макета для контекстной рекламы» <span className="text-green-400 font-normal">выполнено</span></p>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">2 апреля 2025</span>
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">Исполнитель: Екатерина С.</p>
+                <p className="text-sm italic">"Заказчик была на связи во время выполнения задания, оперативно приняла результат. Буду рада помочь еще!)"</p>
+              </Card>
+            </div>
+          </section>
+          
+          <section className="border-t pt-6 mt-6">
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><Briefcase className="h-6 w-6 mr-2.5 text-accent"/>О себе (в разработке)</h3>
+            <p className="text-sm text-muted-foreground pl-8">Здесь будет ваше описание, навыки и опыт. Вы сможете отредактировать эту информацию позже.</p>
+          </section>
+
+           <section className="border-t pt-6 mt-6">
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><ListChecks className="h-6 w-6 mr-2.5 text-accent"/>Специализации (в разработке)</h3>
+            <p className="text-sm text-muted-foreground pl-8">Укажите категории услуг, которые вы предоставляете.</p>
+          </section>
+
         </CardContent>
         <CardFooter className="border-t p-6 sm:p-8">
-            <Button className="w-full hover:scale-105 transition-transform">
-                <Edit className="h-4 w-4 mr-2" /> Редактировать профиль
+            <Button className="w-full hover-scale text-base py-3">
+                <Edit className="h-5 w-5 mr-2" /> Редактировать профиль (в разработке)
             </Button>
         </CardFooter>
       </Card>

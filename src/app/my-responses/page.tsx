@@ -1,16 +1,27 @@
-
-// src/app/my-responses/page.tsx
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { FileText, LogIn, UserCircle, ListFilter, Briefcase, CalendarCheck2, ExternalLink, Loader2 } from "lucide-react";
+import { FileText, LogIn, UserCircle, ListFilter, Briefcase, CalendarCheck2, ExternalLink, Loader2, AlertCircle } from "lucide-react";
 import { useState, useEffect } from 'react';
-import { auth, db } from '@/lib/firebase'; // Ensure db is imported
+import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import type { ResponseData } from "@/lib/schemas"; // Import ResponseData type
-import { collection, query, where, getDocs, orderBy, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, Timestamp, FirestoreError } from "firebase/firestore";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+// Обновим интерфейс ResponseData, чтобы включить необходимые поля
+interface ResponseData {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  taskCategory: string;
+  responderId: string;
+  respondedAt: string;
+  firestoreRespondedAt: Timestamp | string | Date;
+  status?: string;
+  responseMessage?: string; // Делаем поле опциональным
+}
 
 const formatDate = (date: any): string => {
   if (!date) return 'Дата не указана';
@@ -31,14 +42,10 @@ export default function MyResponsesPage() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [userResponses, setUserResponses] = useState<ResponseData[]>([]);
   const [isLoadingResponses, setIsLoadingResponses] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth) {
-      setIsLoadingAuth(false);
-      setIsLoadingResponses(false);
-      return;
-    }
-    const unsubscribe = auth.onAuthStateChanged(currentUser => {
+    const unsubscribe = auth?.onAuthStateChanged(currentUser => {
       setUser(currentUser);
       setIsLoadingAuth(false);
       if (currentUser && db) {
@@ -48,39 +55,114 @@ export default function MyResponsesPage() {
         setIsLoadingResponses(false);
       }
     });
-    return () => unsubscribe();
+    
+    return () => unsubscribe?.();
   }, []);
 
   const fetchUserResponses = async (userId: string) => {
     if (!db) {
       console.error("Firestore (db) is not initialized. Cannot fetch responses.");
+      setError("База данных не инициализирована. Попробуйте перезагрузить страницу.");
       setIsLoadingResponses(false);
       return;
     }
+    
     setIsLoadingResponses(true);
+    setError(null);
+    
     try {
+      // Попробуем запрос с составным индексом
       const responsesRef = collection(db, "responses");
-      const q = query(responsesRef, where("responderId", "==", userId), orderBy("respondedAt", "desc"));
+      
+      // Используем оригинальный запрос
+      const q = query(
+        responsesRef, 
+        where("responderId", "==", userId), 
+        orderBy("respondedAt", "desc")
+      );
+      
       const querySnapshot = await getDocs(q);
       const responses: ResponseData[] = [];
+      
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         responses.push({
           id: doc.id,
-          ...data,
+          taskId: data.taskId,
+          taskTitle: data.taskTitle,
+          taskCategory: data.taskCategory,
+          responderId: data.responderId,
           respondedAt: formatDate(data.respondedAt),
-          firestoreRespondedAt: data.respondedAt, // keep original timestamp if needed for sorting
-        } as ResponseData);
+          firestoreRespondedAt: data.respondedAt,
+          status: data.status,
+          responseMessage: data.responseMessage || data.message || data.comment // Учитываем разные возможные имена поля
+        });
       });
+      
       setUserResponses(responses);
+      
     } catch (error) {
       console.error("Error fetching user responses:", error);
-      // Optionally, show a toast to the user
+      
+      // Проверяем, является ли ошибка проблемой с индексом
+      if (
+        error instanceof FirestoreError && 
+        error.code === 'failed-precondition' && 
+        error.message.includes('index')
+      ) {
+        setError("Требуется создание индекса в Firebase. Пожалуйста, сообщите администратору.");
+        
+        // Попробуем альтернативный запрос без составного индекса
+        try {
+          const simpleQuery = query(
+            collection(db, "responses"), 
+            where("responderId", "==", userId)
+          );
+          
+          const fallbackSnapshot = await getDocs(simpleQuery);
+          const fallbackResponses: ResponseData[] = [];
+          
+          fallbackSnapshot.forEach((doc) => {
+            const data = doc.data();
+            fallbackResponses.push({
+              id: doc.id,
+              taskId: data.taskId,
+              taskTitle: data.taskTitle,
+              taskCategory: data.taskCategory,
+              responderId: data.responderId,
+              respondedAt: formatDate(data.respondedAt),
+              firestoreRespondedAt: data.respondedAt,
+              status: data.status,
+              responseMessage: data.responseMessage || data.message || data.comment
+            });
+          });
+          
+          // Сортируем на клиенте, так как не можем использовать orderBy
+          fallbackResponses.sort((a, b) => {
+            const dateA = a.firestoreRespondedAt instanceof Timestamp 
+              ? a.firestoreRespondedAt.toMillis() 
+              : new Date(a.firestoreRespondedAt as any).getTime();
+              
+            const dateB = b.firestoreRespondedAt instanceof Timestamp 
+              ? b.firestoreRespondedAt.toMillis() 
+              : new Date(b.firestoreRespondedAt as any).getTime();
+            
+            return dateB - dateA; // Сортировка от новых к старым
+          });
+          
+          setUserResponses(fallbackResponses);
+          setError("Данные загружены в ограниченном режиме. Сортировка может быть некорректной.");
+          
+        } catch (fallbackError) {
+          console.error("Error in fallback query:", fallbackError);
+        }
+      } else {
+        setError("Произошла ошибка при загрузке данных. Попробуйте позже.");
+      }
     } finally {
       setIsLoadingResponses(false);
     }
   };
-
 
   if (isLoadingAuth) {
     return (
@@ -105,7 +187,7 @@ export default function MyResponsesPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-6">Для доступа к этой странице необходимо войти в систему.</p>
-            <Button size="lg" asChild className="hover-scale">
+            <Button size="lg" asChild className="hover:scale-105 transition-transform">
               <Link href="/">На главную</Link>
             </Button>
           </CardContent>
@@ -126,7 +208,7 @@ export default function MyResponsesPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto pb-8">
       <div className="mb-6 sm:mb-8 text-center sm:text-left">
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl flex items-center justify-center sm:justify-start">
             <FileText className="h-8 w-8 mr-3 text-accent" />
@@ -135,10 +217,18 @@ export default function MyResponsesPage() {
         <p className="mt-2 text-md text-muted-foreground">Здесь отображаются задания, на которые вы откликнулись.</p>
       </div>
 
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Внимание</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       {userResponses.length > 0 ? (
         <div className="space-y-4 sm:space-y-6">
           {userResponses.map((response) => (
-            <Card key={response.id} className="shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/80 backdrop-blur-sm">
+            <Card key={response.id} className="shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover:translate-y-[-2px] transition-transform bg-card/80 backdrop-blur-sm">
               <CardHeader className="pb-2 sm:pb-3">
                 <Link href={`/tasks/${response.taskId}`} className="hover:text-accent transition-colors">
                   <CardTitle className="text-lg sm:text-xl">{response.taskTitle}</CardTitle>
@@ -147,12 +237,20 @@ export default function MyResponsesPage() {
                   <Briefcase className="h-4 w-4 mr-1.5 text-accent/80" /> Категория: {response.taskCategory}
                 </CardDescription>
               </CardHeader>
-              <CardFooter className="text-xs sm:text-sm text-muted-foreground border-t pt-3 pb-4 px-4 sm:px-6 flex justify-between items-center">
+              {response.responseMessage && (
+                <CardContent className="py-2">
+                  <div className="bg-muted/30 rounded-md p-3 text-sm">
+                    <p className="text-xs font-medium mb-1 text-muted-foreground">Ваш комментарий:</p>
+                    <p className="italic">{response.responseMessage}</p>
+                  </div>
+                </CardContent>
+              )}
+              <CardFooter className="text-xs sm:text-sm text-muted-foreground border-t pt-3 pb-4 px-4 sm:px-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                 <span className="flex items-center">
                   <CalendarCheck2 className="h-4 w-4 mr-1.5 text-accent/70" />
                   Отклик оставлен: {response.respondedAt}
                 </span>
-                <Button variant="outline" size="sm" asChild className="hover-scale text-xs px-3">
+                <Button variant="outline" size="sm" asChild className="hover:scale-105 transition-transform text-xs px-3">
                   <Link href={`/tasks/${response.taskId}`}>
                     <ExternalLink className="h-3 w-3 mr-1.5" />
                     К заданию
@@ -167,7 +265,7 @@ export default function MyResponsesPage() {
            <ListFilter className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mb-4" />
           <h3 className="text-xl sm:text-2xl font-semibold mb-2">У вас пока нет откликов</h3>
           <p className="text-muted-foreground mb-6">Найдите интересные задания и откликайтесь на них!</p>
-          <Button size="lg" asChild className="hover-scale">
+          <Button size="lg" asChild className="hover:scale-105 transition-transform">
             <Link href="/tasks">Найти задания</Link>
           </Button>
         </Card>
