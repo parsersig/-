@@ -1,4 +1,3 @@
-// src/components/layout/header.tsx
 "use client";
 import * as React from 'react';
 import Link from 'next/link';
@@ -19,7 +18,7 @@ import {
   FileText
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -45,6 +44,20 @@ interface NavLink {
   icon: LucideIcon;
 }
 
+// Кэшированные навигационные ссылки, вынесенные за пределы компонента
+const mainNavLinks: NavLink[] = [
+  { href: "/tasks", label: "Найти задания", icon: Search },
+  { href: "/create-task", label: "Создать задание", icon: FilePlus2 },
+];
+
+const userMenuLinks: NavLink[] = [
+  { href: "/profile", label: "Мой профиль", icon: UserCircle },
+  { href: "/my-tasks", label: "Мои задания", icon: ListChecks },
+  { href: "/my-responses", label: "Мои отклики", icon: FileText },
+  { href: "/messages", label: "Сообщения", icon: MessageSquare },
+  { href: "/notifications", label: "Уведомления", icon: Bell },
+];
+
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { toast } = useToast();
@@ -69,7 +82,7 @@ export default function Header() {
     }
   }, []);
 
-  const handleLogin = async () => {
+  const handleLogin = useCallback(async () => {
     if (!auth) {
       toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
       return;
@@ -86,10 +99,12 @@ export default function Header() {
         description: error.message || "Не удалось войти через Google. Попробуйте еще раз.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoadingAuth(false);
     }
-  };
+  }, [toast]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     if (!auth) {
       toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
       return;
@@ -106,21 +121,10 @@ export default function Header() {
         description: error.message || "Не удалось выйти из системы.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoadingAuth(false);
     }
-  };
-
-  const mainNavLinks: NavLink[] = [
-    { href: "/tasks", label: "Найти задания", icon: Search },
-    { href: "/create-task", label: "Создать задание", icon: FilePlus2 },
-  ];
-
-  const userMenuLinks: NavLink[] = [
-    { href: "/profile", label: "Мой профиль", icon: UserCircle },
-    { href: "/my-tasks", label: "Мои задания", icon: ListChecks },
-    { href: "/my-responses", label: "Мои отклики", icon: FileText },
-    { href: "/messages", label: "Сообщения", icon: MessageSquare },
-    { href: "/notifications", label: "Уведомления", icon: Bell },
-  ];
+  }, [toast]);
 
   if (isLoadingAuth) {
     return (
@@ -158,7 +162,7 @@ export default function Header() {
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full" aria-label="Меню пользователя">
                   <Avatar className="h-9 w-9">
                     <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="user avatar"/>
                     <AvatarFallback>
