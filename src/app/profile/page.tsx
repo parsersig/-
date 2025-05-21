@@ -1,16 +1,17 @@
-// src/app/profile/page.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"; // Removed DialogClose as it's not explicitly used for submission
-import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, Clock, ListChecks, Loader2, MessageCircle } from "lucide-react"; // Added MessageCircle for consistency if needed later
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, Clock, ListChecks, Loader2, MessageCircle } from "lucide-react";
 import { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
-import { doc, getDoc, setDoc, DocumentSnapshot, Timestamp } from "firebase/firestore"; // Added setDoc
+import { doc, getDoc, setDoc, DocumentSnapshot, Timestamp } from "firebase/firestore";
 import Link from "next/link";
 import EditProfileForm from "@/components/profile/edit-profile-form";
 import type { UserProfile, EditUserProfileFormValues, ReviewData } from "@/lib/schemas";
@@ -48,6 +49,10 @@ const formatDateTime = (dateTimeInput: string | Date | Timestamp | undefined): s
     return date.toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
+// Расширяем тип ReviewData, добавляя taskTitle
+interface ExtendedReviewData extends ReviewData {
+  taskTitle?: string;
+}
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -57,7 +62,7 @@ export default function ProfilePage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   // Заглушки для статистики и отзывов
-  const placeholderReviews: ReviewData[] = [
+  const placeholderReviews: ExtendedReviewData[] = [
     {
       id: '1',
       reviewerId: 'guest1',
@@ -97,7 +102,7 @@ export default function ProfilePage() {
         setUserProfile(profileSnap.data());
       } else {
         // Профиль еще не создан, создаем базовый
-        console.log("No user profile found for UID:", currentUser.uid, "Attempting to create one.");
+        console.log("No user profile found for UID:", currentUser.uid, "Creating one now.");
         const newProfileData: UserProfile = {
             uid: currentUser.uid,
             email: currentUser.email || undefined,
@@ -108,9 +113,10 @@ export default function ProfilePage() {
             city: "Ирбит", 
             aboutMe: "",
             specializations: [],
+            phoneVerified: false, // Добавлено обязательное поле
             // другие поля можно инициализировать по умолчанию или оставить undefined
         };
-        await setDoc(doc(db, "userProfiles", currentUser.uid), newProfileData); // Corrected: Use setDoc properly
+        await setDoc(doc(db, "userProfiles", currentUser.uid), newProfileData);
         setUserProfile(newProfileData);
         console.log("New user profile created in Firestore with basic data.");
       }
@@ -155,13 +161,14 @@ export default function ProfilePage() {
             registrationDate: prev?.registrationDate || (user?.metadata.creationTime ? Timestamp.fromDate(new Date(user.metadata.creationTime)) : undefined),
             lastSignInTime: prev?.lastSignInTime || (user?.metadata.lastSignInTime ? Timestamp.fromDate(new Date(user.metadata.lastSignInTime)) : undefined),
             city: prev?.city || "Ирбит",
+            phoneVerified: prev?.phoneVerified || false, // Добавлено обязательное поле
             ...updatedData, // Apply updates from the form
         };
     });
     setIsEditDialogOpen(false);
   };
 
-  if (isLoadingAuth || (user && isLoadingProfile && userProfile === undefined)) { // Check if userProfile is undefined instead of null for initial loading
+  if (isLoadingAuth || (user && isLoadingProfile && userProfile === undefined)) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <div className="text-center p-4">
@@ -197,33 +204,70 @@ export default function ProfilePage() {
   const displayDisplayName = userProfile?.displayName || user.displayName || "Пользователь";
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8 pb-10">
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-8">
       {/* --- Hero Section --- */}
-      <Card className="shadow-xl bg-card/80 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="relative p-0">
-          <div className="h-32 sm:h-40 bg-gradient-to-r from-accent/30 via-primary/20 to-accent/30"></div>
-          <div className="absolute top-16 sm:top-20 left-1/2 -translate-x-1/2 flex flex-col items-center w-full px-4">
-            <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-4 border-background bg-background shadow-lg">
-              <AvatarImage src={displayPhotoURL} alt={displayDisplayName} data-ai-hint="user avatar large" />
-              <AvatarFallback className="text-4xl sm:text-5xl bg-muted">
-                {displayDisplayName ? displayDisplayName.charAt(0).toUpperCase() : <UserCircle className="h-16 w-16"/>}
-              </AvatarFallback>
-            </Avatar>
-            <CardTitle className="text-2xl sm:text-3xl font-bold mt-3">{displayDisplayName}</CardTitle>
-            <CardDescription className="text-sm sm:text-md text-muted-foreground pt-0.5">
-              {userProfile?.city || "Ирбит"} {userProfile?.age && `• ${userProfile.age} лет (заглушка)`}
-            </CardDescription>
-            <div className="flex flex-wrap gap-2 mt-2 justify-center">
-              <Badge variant="outline" className="border-green-500/70 text-green-400">Исполнитель (статус)</Badge>
-              <Badge variant="outline" className="border-blue-500/70 text-blue-400">Проверен</Badge>
+      <Card className="shadow-xl bg-card/90 backdrop-blur-sm border border-accent/10 overflow-hidden">
+        <div className="h-40 bg-gradient-to-r from-accent/40 via-primary/20 to-accent/40 relative">
+          {/* Декоративные элементы для фона */}
+          <div className="absolute inset-0 overflow-hidden opacity-30">
+            <div className="absolute top-0 left-0 w-40 h-40 bg-accent/20 rounded-full -translate-x-1/2 -translate-y-1/2 blur-xl"></div>
+            <div className="absolute bottom-0 right-0 w-60 h-60 bg-primary/30 rounded-full translate-x-1/3 translate-y-1/3 blur-2xl"></div>
+          </div>
+        </div>
+        
+        <div className="relative px-6 sm:px-10 pb-6 -mt-16 flex flex-col sm:flex-row items-center sm:items-end gap-6">
+          <Avatar className="h-32 w-32 sm:h-36 sm:w-36 border-4 border-background shadow-xl">
+            <AvatarImage src={displayPhotoURL} alt={displayDisplayName} />
+            <AvatarFallback className="text-5xl sm:text-6xl bg-muted">
+              {displayDisplayName ? displayDisplayName.charAt(0).toUpperCase() : <UserCircle className="h-20 w-20"/>}
+            </AvatarFallback>
+            
+            {/* Индикатор верифицированности */}
+            {user.emailVerified && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-1 shadow-md">
+                      <ShieldCheck className="h-6 w-6 text-green-500" />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Email подтвержден</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </Avatar>
+          
+          <div className="flex-1 text-center sm:text-left space-y-2 pb-2">
+            <div className="flex flex-col sm:flex-row items-center sm:items-baseline gap-1 sm:gap-2">
+              <h1 className="text-2xl sm:text-3xl font-bold">{displayDisplayName}</h1>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="outline" className="px-2 py-0.5 border-green-500/30 bg-green-500/5 text-green-500">
+                  Исполнитель
+                </Badge>
+                <Badge variant="outline" className="px-2 py-0.5 border-blue-500/30 bg-blue-500/5 text-blue-500">
+                  Проверен
+                </Badge>
+              </div>
             </div>
-             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="mt-4 hover-scale text-base py-3 px-6">
-                    <Edit className="h-5 w-5 mr-2" /> Редактировать профиль
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+            
+            <p className="text-muted-foreground">
+              {userProfile?.city || "Ирбит"} {userProfile?.age && `• ${userProfile.age} лет`}
+            </p>
+            
+            <p className="text-sm text-muted-foreground/80">
+              На сайте с {formatDate(userProfile?.registrationDate || user.metadata.creationTime)}
+            </p>
+            
+            <div className="pt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="px-4">
+                    <Edit className="h-4 w-4 mr-2" /> Редактировать профиль
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle className="text-2xl">Редактирование профиля</DialogTitle>
                     <DialogDescription>
@@ -232,112 +276,212 @@ export default function ProfilePage() {
                   </DialogHeader>
                   <div className="overflow-y-auto pr-2 flex-grow">
                     <EditProfileForm 
-                        currentUser={user} 
-                        initialProfileData={userProfile || { uid: user.uid } }
-                        onProfileUpdated={handleProfileUpdateSuccess}
-                        onCancel={() => setIsEditDialogOpen(false)}
+                      currentUser={user} 
+                      initialProfileData={userProfile || { uid: user.uid } as UserProfile}
+                      onProfileUpdated={handleProfileUpdateSuccess}
+                      onCancel={() => setIsEditDialogOpen(false)}
                     />
                   </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* --- Основная информация и О себе --- */}
+      <div className="grid md:grid-cols-3 gap-6">
+        <Card className="md:col-span-2 shadow-lg bg-card/90 backdrop-blur-sm border border-accent/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xl flex items-center">
+              <UserCircle className="h-5 w-5 mr-2 text-accent"/>
+              Основная информация
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+              <div className="space-y-1">
+                <p className="font-medium text-muted-foreground">Email</p>
+                <p className="flex items-center font-medium text-foreground">
+                  {user.email || "Не указан"} 
+                  {user.emailVerified && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <ShieldCheck className="h-4 w-4 ml-1.5 text-green-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Email подтвержден</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-muted-foreground">Дата регистрации</p>
+                <p className="font-medium text-foreground">{formatDate(userProfile?.registrationDate || user.metadata.creationTime)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-muted-foreground">Город</p>
+                <p className="font-medium text-foreground">{userProfile?.city || "Ирбит"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-muted-foreground">Последний визит</p>
+                <p className="font-medium text-foreground">{formatDateTime(userProfile?.lastSignInTime || user.metadata.lastSignInTime)}</p>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-accent"/>
+                О себе
+              </h3>
+              {isLoadingProfile ? (
+                <div className="animate-pulse h-24 bg-muted/40 rounded-md"></div>
+              ) : userProfile?.aboutMe ? (
+                <div className="prose prose-sm max-w-none text-muted-foreground whitespace-pre-line rounded-md">
+                  {userProfile.aboutMe}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic py-2">
+                  Информация о себе еще не добавлена. Нажмите "Редактировать профиль", чтобы заполнить.
+                </p>
+              )}
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <ListChecks className="h-5 w-5 text-accent"/>
+                Специализации
+              </h3>
+              {isLoadingProfile ? (
+                <div className="animate-pulse h-10 bg-muted/40 rounded-md"></div>
+              ) : userProfile?.specializations && userProfile.specializations.length > 0 ? (
+                <div className="flex flex-wrap gap-2 py-1">
+                  {userProfile.specializations.map(spec => (
+                    <Badge key={spec} className="bg-accent/10 text-accent border-accent/20 hover:bg-accent/20 transition-colors">
+                      {spec}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic py-2">
+                  Специализации еще не выбраны. Нажмите "Редактировать профиль", чтобы их добавить.
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* --- Статистика в сайдбаре --- */}
+        <Card className="md:col-span-1 shadow-lg bg-card/90 backdrop-blur-sm h-fit border border-accent/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xl flex items-center">
+              <TrendingUp className="h-5 w-5 mr-2 text-accent"/>
+              Статистика
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-muted/30 rounded-lg p-4 hover:bg-muted/40 transition-colors border border-accent/5">
+              <p className="text-sm font-medium text-muted-foreground">Заданий создано</p>
+              <p className="text-3xl font-bold text-accent mt-1">{userProfile?.tasksCreated || 0}</p>
+            </div>
+            
+            <div className="bg-muted/30 rounded-lg p-4 hover:bg-muted/40 transition-colors border border-accent/5">
+              <p className="text-sm font-medium text-muted-foreground">Заданий выполнено</p>
+              <p className="text-3xl font-bold text-accent mt-1">{userProfile?.tasksCompleted || 0}</p>
+            </div>
+            
+            <div className="bg-muted/30 rounded-lg p-4 hover:bg-muted/40 transition-colors border border-accent/5">
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-medium text-muted-foreground">Рейтинг</p>
+                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+              </div>
+              <div className="flex items-baseline gap-2 mt-1">
+                <p className="text-3xl font-bold text-accent">
+                  {userProfile?.averageRating?.toFixed(1) || "–"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {userProfile?.reviewsCount || 0} отзывов
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* --- Отзывы --- */}
+      <Card className="shadow-lg bg-card/90 backdrop-blur-sm border border-accent/10">
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-xl flex items-center">
+              <Star className="h-5 w-5 mr-2 text-accent"/>
+              Рейтинг и Отзывы
+            </CardTitle>
+            <div className="flex items-baseline text-sm">
+              <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 mr-1" />
+              <span className="font-semibold text-lg text-foreground">
+                {userProfile?.averageRating?.toFixed(1) || "Н/Д"}
+              </span>
+              <span className="text-muted-foreground ml-1">
+                ({userProfile?.reviewsCount || 0} отзывов)
+              </span>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-40 sm:pt-48 p-6 space-y-8"> 
-          <section>
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><UserCircle className="h-6 w-6 mr-2.5 text-accent"/>Основная информация</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm text-muted-foreground pl-2">
-                <p className="flex items-center"><Mail className="h-4 w-4 mr-2 text-accent/80 shrink-0" />Email: <span className="ml-1.5 font-medium text-foreground/90 truncate">{user.email || "Не указан"}</span> {user.emailVerified && <span title="Email подтвержден"><ShieldCheck className="h-4 w-4 ml-1.5 text-green-400 shrink-0" /></span>}</p>
-                <p className="flex items-center"><CalendarDays className="h-4 w-4 mr-2 text-accent/80 shrink-0" />Регистрация: <span className="ml-1.5 font-medium text-foreground/90">{formatDate(user.metadata.creationTime)}</span></p>
-                <p className="flex items-center sm:col-span-2"><Clock className="h-4 w-4 mr-2 text-accent/80 shrink-0" />Последний визит: <span className="ml-1.5 font-medium text-foreground/90">{formatDateTime(user.metadata.lastSignInTime)}</span></p>
-            </div>
-          </section>
-          
-          <section className="border-t pt-6">
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><Briefcase className="h-6 w-6 mr-2.5 text-accent"/>О себе</h3>
-            {isLoadingProfile && userProfile === undefined && <p className="text-sm text-muted-foreground italic">Загрузка информации...</p>}
-            {!isLoadingProfile && userProfile?.aboutMe && <p className="text-sm text-muted-foreground whitespace-pre-line">{userProfile.aboutMe}</p>}
-            {!isLoadingProfile && !userProfile?.aboutMe && <p className="text-sm text-muted-foreground italic">Информация о себе еще не добавлена. Нажмите "Редактировать профиль", чтобы ее заполнить.</p>}
-          </section>
-
-           <section className="border-t pt-6">
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><ListChecks className="h-6 w-6 mr-2.5 text-accent"/>Специализации</h3>
-            {isLoadingProfile && userProfile === undefined && <p className="text-sm text-muted-foreground italic">Загрузка специализаций...</p>}
-            {!isLoadingProfile && userProfile?.specializations && userProfile.specializations.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {userProfile.specializations.map(spec => <Badge key={spec} variant="secondary" className="bg-accent/10 text-accent border-accent/30">{spec}</Badge>)}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">Специализации еще не выбраны. Нажмите "Редактировать профиль", чтобы их добавить.</p>
-            )}
-          </section>
-      
-          <section className="border-t pt-6">
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><TrendingUp className="h-6 w-6 mr-2.5 text-accent"/>Активность и Статистика (заглушка)</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <Card className="p-4 bg-muted/30 rounded-lg text-center shadow-sm">
-                    <p className="text-3xl font-bold text-accent">{userProfile?.tasksCreated || 0}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Заданий создано</p>
-                </Card>
-                <Card className="p-4 bg-muted/30 rounded-lg text-center shadow-sm">
-                    <p className="text-3xl font-bold text-accent">{userProfile?.tasksCompleted || 0}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Заданий выполнено</p>
-                </Card>
-                 <Card className="p-4 bg-muted/30 rounded-lg text-center shadow-sm sm:col-span-2 md:col-span-1">
-                    <p className="text-3xl font-bold text-accent">{userProfile?.reviewsCount || 0}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Отзывов получено</p>
-                </Card>
-            </div>
-          </section>
-
-          <section className="border-t pt-6">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-xl font-semibold text-foreground flex items-center"><Star className="h-6 w-6 mr-2.5 text-accent"/>Рейтинг и Отзывы</h3>
-              <div className="flex items-baseline space-x-1 text-sm">
-                  <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                  <span className="font-semibold text-lg text-foreground">{userProfile?.averageRating?.toFixed(1) || "Н/Д"}</span>
-                  <span className="text-muted-foreground">({userProfile?.reviewsCount || 0} отзывов)</span>
-              </div>
-            </div>
-            {/* TODO: Load and display actual reviews. For now, using placeholders. */}
-            {placeholderReviews.length > 0 ? (
-              <div className="space-y-4">
-                {placeholderReviews.map((review) => (
-                  <Card key={review.id} className="p-4 bg-muted/30 shadow-sm">
-                    <div className="flex items-start space-x-3">
-                      <Avatar className="h-10 w-10 border">
-                        <AvatarImage src={review.reviewerPhotoURL || undefined} alt={review.reviewerName} data-ai-hint="reviewer avatar" />
-                        <AvatarFallback>{review.reviewerName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold text-foreground/90">{review.reviewerName}</p>
-                          <div className="flex text-yellow-400">
-                            {[...Array(5)].map((_, i) => (
-                              <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'fill-yellow-400' : 'fill-muted stroke-yellow-500/50'}`} />
-                            ))}
-                          </div>
+        
+        <CardContent>
+          {placeholderReviews.length > 0 ? (
+            <div className="space-y-4">
+              {placeholderReviews.map((review) => (
+                <Card key={review.id} className="p-4 bg-muted/20 rounded-md shadow-sm overflow-hidden">
+                  <div className="flex items-start space-x-4">
+                    <Avatar className="h-10 w-10 border">
+                      <AvatarImage src={review.reviewerPhotoURL || undefined} alt={review.reviewerName} />
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        {review.reviewerName.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    <div className="flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <h4 className="font-medium">{review.reviewerName}</h4>
+                        <div className="flex text-yellow-400">
+                          {[...Array(5)].map((_, i) => (
+                            <Star 
+                              key={i} 
+                              className={`h-4 w-4 ${i < review.rating ? 'fill-yellow-400' : 'fill-muted stroke-yellow-500/50'}`} 
+                            />
+                          ))}
                         </div>
-                        {review.taskTitle && <p className="text-xs text-muted-foreground">По заданию: «{review.taskTitle}»</p>}
-                         <p className="text-xs text-muted-foreground mb-1.5">{review.createdAt}</p>
-                        <p className="text-sm text-muted-foreground italic">"{review.comment}"</p>
                       </div>
+                      
+                      {review.taskTitle && (
+                        <Badge variant="outline" className="mt-1 mb-1 bg-background/50">
+                          {review.taskTitle}
+                        </Badge>
+                      )}
+                      
+                      <p className="text-xs text-muted-foreground mb-1">{review.createdAt}</p>
+                      <p className="text-sm text-muted-foreground italic">"{review.comment}"</p>
                     </div>
-                  </Card>
-                ))}
-                {/* <div className="text-center pt-2">
-                  <Button variant="link" className="text-accent text-sm">Показать все отзывы (в разработке)</Button>
-                </div> */}
-              </div>
-            ) : (
-               <p className="text-sm text-muted-foreground italic text-center py-4">Отзывов пока нет.</p>
-            )}
-          </section>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10">
+              <MessageCircle className="h-12 w-12 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-muted-foreground">Отзывов пока нет</p>
+            </div>
+          )}
         </CardContent>
-        {/* Footer с кнопкой редактирования убран, т.к. кнопка теперь в CardHeader */}
       </Card>
     </div>
   );
 }
-
-
-    
