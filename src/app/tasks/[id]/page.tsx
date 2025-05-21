@@ -1,5 +1,3 @@
-
-// src/app/tasks/[id]/page.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -13,7 +11,7 @@ import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSqu
 import type { StoredTask, ResponseData } from "@/lib/schemas";
 import { useToast } from "@/hooks/use-toast";
 import { db, auth } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, increment, Timestamp, collection, addDoc, serverTimestamp, query, where, getDocs, orderBy } from "firebase/firestore";
+import { doc, getDoc, updateDoc, increment, Timestamp, collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, onSnapshot, Firestore } from "firebase/firestore";
 import type { User } from "firebase/auth";
 
 const formatDate = (date: any): string => {
@@ -79,10 +77,14 @@ export default function TaskDetailPage() {
       console.warn("Firestore not initialized, cannot increment view count.");
       return;
     }
+    
+    // Явное приведение db к типу Firestore (т.к. мы уже проверили, что db не null)
+    const firestore = db as Firestore;
+    
     const viewedTasksKey = `viewedTask_${currentTaskId}`;
     if (!sessionStorage.getItem(viewedTasksKey)) {
       try {
-        const taskRef = doc(db, "tasks", currentTaskId);
+        const taskRef = doc(firestore, "tasks", currentTaskId);
         await updateDoc(taskRef, {
           views: increment(1),
         });
@@ -100,9 +102,13 @@ export default function TaskDetailPage() {
   useEffect(() => {
     if (taskId && db) {
       setIsLoading(true);
+      
+      // Явное приведение db к типу Firestore
+      const firestore = db as Firestore;
+      
       const fetchTask = async () => {
         try {
-          const taskRef = doc(db, "tasks", taskId);
+          const taskRef = doc(firestore, "tasks", taskId);
           const taskSnap = await getDoc(taskRef);
 
           if (taskSnap.exists()) {
@@ -143,10 +149,13 @@ export default function TaskDetailPage() {
         if (task === null) setIsLoadingResponses(false); // Если задание не найдено, отклики тоже не грузим
         return;
     }
+    
+    // Явное приведение db к типу Firestore
+    const firestore = db as Firestore;
 
     // Check if current user has already responded to this task
     const checkResponseStatus = async () => {
-      const responsesRef = collection(db, "responses");
+      const responsesRef = collection(firestore, "responses");
       const q = query(responsesRef, where("taskId", "==", task.id), where("responderId", "==", currentUser.uid));
       const querySnapshot = await getDocs(q);
       setHasResponded(!querySnapshot.empty);
@@ -158,13 +167,13 @@ export default function TaskDetailPage() {
     if (task.userId === currentUser.uid) {
       setIsLoadingResponses(true);
       const responsesQuery = query(
-        collection(db, "responses"),
+        collection(firestore, "responses"),
         where("taskId", "==", task.id),
         orderBy("respondedAt", "desc")
       );
-      const unsubscribeResponses = onSnapshot(responsesQuery, (snapshot) => {
+      const unsubscribeResponses = onSnapshot(responsesQuery, (snapshot: any) => {
         const responses: ResponseData[] = [];
-        snapshot.forEach((docSnap) => {
+        snapshot.forEach((docSnap: any) => {
           const data = docSnap.data();
           responses.push({
             id: docSnap.id,
@@ -175,7 +184,7 @@ export default function TaskDetailPage() {
         });
         setTaskResponses(responses);
         setIsLoadingResponses(false);
-      }, (error) => {
+      }, (error: any) => {
         console.error("Error fetching task responses:", error);
         toast({ title: "Ошибка", description: "Не удалось загрузить отклики на задание.", variant: "destructive" });
         setIsLoadingResponses(false);
@@ -190,6 +199,10 @@ export default function TaskDetailPage() {
 
   const handleRespond = async () => {
     if (!task || !db) return;
+    
+    // Явное приведение db к типу Firestore
+    const firestore = db as Firestore;
+    
     if (!currentUser) {
       toast({
         title: "Требуется вход",
@@ -231,7 +244,7 @@ export default function TaskDetailPage() {
         respondedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, "responses"), responseData);
+      await addDoc(collection(firestore, "responses"), responseData);
 
       toast({
         title: "Отлично!",
@@ -422,4 +435,3 @@ export default function TaskDetailPage() {
     </div>
   );
 }
-
