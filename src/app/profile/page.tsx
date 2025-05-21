@@ -96,7 +96,15 @@ export default function ProfilePage() {
           <section>
             <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><UserCircle className="h-6 w-6 mr-2.5 text-accent"/>Основная информация</h3>
             <div className="space-y-2 text-sm text-muted-foreground pl-8">
-              <p className="flex items-center"><Mail className="h-4 w-4 mr-2.5 text-accent/80" />Email: <span className="ml-1 font-medium text-foreground/90">{user.email || "Не указан"}</span> {user.emailVerified && <ShieldCheck className="h-4 w-4 ml-2 text-green-400" title="Email подтвержден" />}</p>
+              <p className="flex items-center">
+                <Mail className="h-4 w-4 mr-2.5 text-accent/80" />
+                Email: <span className="ml-1 font-medium text-foreground/90">{user.email || "Не указан"}</span> 
+                {user.emailVerified && (
+                  <span title="Email подтвержден">
+                    <ShieldCheck className="h-4 w-4 ml-2 text-green-400" aria-label="Email подтвержден" />
+                  </span>
+                )}
+              </p>
               <p className="flex items-center"><CalendarDays className="h-4 w-4 mr-2.5 text-accent/80" />Дата регистрации: <span className="ml-1 font-medium text-foreground/90">{registrationDate}</span></p>
               <p className="flex items-center"><Clock className="h-4 w-4 mr-2.5 text-accent/80" />Был(а) на сайте: <span className="ml-1 font-medium text-foreground/90">{lastSignInDate} (реально)</span></p>
               <p className="text-xs mt-1">Подтверждения: Email, Телефон, Соцсеть (заглушка)</p>
