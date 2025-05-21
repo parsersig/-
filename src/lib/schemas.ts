@@ -79,7 +79,6 @@ export const responseSchema = z.object({
   message: z.string().max(1000, "Сообщение не должно превышать 1000 символов.").optional(), 
   // respondedAt будет serverTimestamp
 });
-
 export type ResponseData = z.infer<typeof responseSchema> & {
   id: string;
   respondedAt: any; 
@@ -94,7 +93,6 @@ export const notificationSchema = z.object({
   read: z.boolean().default(false),
   // createdAt будет serverTimestamp
 });
-
 export type NotificationData = z.infer<typeof notificationSchema> & {
   id: string;
   createdAt: any; 
@@ -113,14 +111,13 @@ export const userProfileSchema = z.object({
     (val) => (String(val).trim() === "" ? undefined : parseInt(String(val), 10)),
     z.number().positive("Возраст должен быть положительным числом").int("Возраст должен быть целым числом").optional().nullable()
   ),
-  registrationDate: z.custom<Timestamp>((val) => val instanceof Timestamp).optional(),
-  lastSignInTime: z.custom<Timestamp>((val) => val instanceof Timestamp).optional(),
+  registrationDate: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for registrationDate").optional(),
+  lastSignInTime: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for lastSignInTime").optional(),
   tasksCreated: z.number().int().min(0).optional().default(0),
   tasksCompleted: z.number().int().min(0).optional().default(0),
   averageRating: z.number().min(0).max(5).optional().nullable(),
   reviewsCount: z.number().int().min(0).optional().default(0),
 });
-
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
 export const editUserProfileSchema = z.object({
@@ -156,7 +153,34 @@ export const reviewSchema = z.object({
   reviewedUserId: z.string(), 
   rating: z.number().min(1).max(5).int(), 
   comment: z.string().min(10, "Комментарий должен содержать минимум 10 символов.").max(1000, "Комментарий не должен превышать 1000 символов."),
-  createdAt: z.custom<Timestamp>((val) => val instanceof Timestamp).optional(), // Для serverTimestamp
+  createdAt: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for createdAt").optional(), 
 });
-
 export type ReviewData = z.infer<typeof reviewSchema>;
+
+
+// --- Схемы для Чата ---
+export const messageSchema = z.object({
+  // id будет генерироваться Firestore
+  chatId: z.string().describe("ID чата, к которому принадлежит сообщение"),
+  senderId: z.string().describe("ID пользователя, отправившего сообщение"),
+  text: z.string().min(1, "Сообщение не может быть пустым.").max(2000, "Сообщение слишком длинное."),
+  sentAt: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for sentAt").describe("Время отправки сообщения (серверный Timestamp)"),
+  // isRead: z.boolean().default(false).optional(), // Для отслеживания прочтения, пока не используем
+});
+export type MessageData = z.infer<typeof messageSchema> & { id?: string }; // id будет добавлен после чтения из Firestore
+
+export const chatSchema = z.object({
+  // id будет генерироваться Firestore
+  participants: z.array(z.string()).min(2, "В чате должно быть как минимум 2 участника.").max(2, "Пока поддерживаются только чаты на двоих."), // Массив ID пользователей
+  participantNames: z.record(z.string(), z.string()).describe("Объект с ID участника в качестве ключа и его displayName в качестве значения"),
+  participantPhotoURLs: z.record(z.string(), z.string().url().nullable()).describe("Объект с ID участника и URL его аватара"),
+  
+  taskId: z.string().optional().describe("ID задания, к которому может быть привязан чат"),
+  taskTitle: z.string().optional().describe("Название задания, для удобства"),
+
+  lastMessageText: z.string().optional().default("").describe("Текст последнего сообщения"),
+  lastMessageAt: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for lastMessageAt").optional().nullable().describe("Время последнего сообщения"),
+  createdAt: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for createdAt").describe("Время создания чата (серверный Timestamp)"),
+  // unreadCounts: z.record(z.string(), z.number().int().min(0)).optional(), // { [userId]: count } - пока не реализуем
+});
+export type ChatData = z.infer<typeof chatSchema> & { id?: string }; // id будет добавлен после чтения из Firestore
