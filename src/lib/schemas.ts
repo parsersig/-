@@ -56,12 +56,13 @@ export type TaskFormValues = z.infer<typeof taskSchema>;
 
 export interface StoredTask extends TaskFormValues {
   id: string;
-  postedDate: any; // Может быть Timestamp или уже отформатированная строка
+  postedDate: any; 
   firestorePostedDate?: Timestamp; 
   city: string;
   views: number;
   userId?: string;
   status?: TaskStatus; 
+  ownerDisplayName?: string; // Добавлено для кеширования имени владельца
 }
 
 export const responseSchema = z.object({
@@ -77,7 +78,7 @@ export const responseSchema = z.object({
 
 export type ResponseData = z.infer<typeof responseSchema> & {
   id: string;
-  respondedAt: any; // Может быть Timestamp или уже отформатированная строка
+  respondedAt: any; 
   firestoreRespondedAt?: Timestamp;
 };
 
@@ -92,11 +93,10 @@ export const notificationSchema = z.object({
 
 export type NotificationData = z.infer<typeof notificationSchema> & {
   id: string;
-  createdAt: any; // Может быть Timestamp или уже отформатированная строка
+  createdAt: any; 
   firestoreCreatedAt?: Timestamp;
 };
 
-// Схема для профиля пользователя
 export const userProfileSchema = z.object({
   uid: z.string(),
   displayName: z.string().optional().nullable(),
@@ -105,11 +105,9 @@ export const userProfileSchema = z.object({
   aboutMe: z.string().max(1000, "Описание не должно превышать 1000 символов.").optional().default(""),
   specializations: z.array(z.enum(taskCategories)).optional().default([]),
   city: z.string().optional().default("Ирбит"),
-  age: z.number().positive().int().optional(),
-  phoneVerified: z.boolean().default(false), // Добавлено обязательное поле
-  registrationDate: z.any().optional(), 
-  lastSignInTime: z.any().optional(), 
-  // Для агрегации
+  age: z.number().positive().int().optional().nullable(),
+  registrationDate: z.custom<Timestamp>((val) => val instanceof Timestamp).optional(),
+  lastSignInTime: z.custom<Timestamp>((val) => val instanceof Timestamp).optional(),
   tasksCreated: z.number().int().min(0).optional().default(0),
   tasksCompleted: z.number().int().min(0).optional().default(0),
   averageRating: z.number().min(0).max(5).optional().nullable(),
@@ -119,15 +117,21 @@ export const userProfileSchema = z.object({
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
 export const editUserProfileSchema = z.object({
+  displayName: z.string().min(2, "Имя должно содержать минимум 2 символа").max(50, "Имя не должно превышать 50 символов").optional(),
+  photoURL: z.string().url("Некорректный URL аватара").optional().or(z.literal("")),
   aboutMe: z.string().max(1000, "Описание не должно превышать 1000 символов.").optional().default(""),
   specializations: z.array(z.enum(taskCategories)).optional().default([]),
+  city: z.string().optional(),
+  age: z.preprocess(
+    (val) => (String(val).trim() === "" ? undefined : parseInt(String(val), 10)),
+    z.number().positive("Возраст должен быть положительным числом").int("Возраст должен быть целым числом").optional().nullable()
+  ),
 });
 export type EditUserProfileFormValues = z.infer<typeof editUserProfileSchema>;
 
-// Схема для отзыва
 export const reviewSchema = z.object({
   taskId: z.string().optional(), 
-  taskTitle: z.string().optional(), // Добавлено для удобства отображения
+  taskTitle: z.string().optional(), 
   reviewerId: z.string(), 
   reviewerName: z.string(), 
   reviewerPhotoURL: z.string().url().optional().nullable(),
@@ -139,6 +143,6 @@ export const reviewSchema = z.object({
 
 export type ReviewData = z.infer<typeof reviewSchema> & {
   id: string;
-  createdAt: any; // Может быть Timestamp или уже отформатированная строка
+  createdAt: any; 
   firestoreCreatedAt?: Timestamp;
 };
