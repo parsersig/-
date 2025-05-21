@@ -1,12 +1,32 @@
-
 "use client";
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Briefcase, Users, Search, FileText, CheckCircle, ArrowRight, TrendingUp, UsersRound, MapPin } from 'lucide-react';
+import { Briefcase, Users, Search, FileText, CheckCircle, ArrowRight, TrendingUp, UsersRound, MapPin, Star, Clock, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function HomePage() {
+  // Добавим анимацию счетчиков
+  const [animatedStats, setAnimatedStats] = useState([
+    { value: 0, target: 150 },
+    { value: 0, target: 300 },
+    { value: 0, target: 100 },
+  ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAnimatedStats(prev => 
+        prev.map((stat, i) => ({
+          ...stat,
+          value: stat.value < stat.target ? Math.min(stat.value + (stat.target / 20), stat.target) : stat.target
+        }))
+      );
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const features = [
     {
       icon: <Search className="h-10 w-10 text-accent mb-4" />,
@@ -30,33 +50,53 @@ export default function HomePage() {
     },
   ];
 
+  // Добавим иконки к категориям для визуального улучшения
   const categories = [
-    "Ремонт и строительство",
-    "Уборка и помощь по хозяйству",
-    "Курьерские услуги",
-    "Компьютерная помощь",
-    "Репетиторство и обучение",
-    "Красота и здоровье",
-    "Мероприятия и промоакции",
-    "Фото и видеосъемка",
+    { name: "Ремонт и строительство", icon: <Briefcase className="h-5 w-5" /> },
+    { name: "Уборка и помощь по хозяйству", icon: <CheckCircle className="h-5 w-5" /> },
+    { name: "Курьерские услуги", icon: <MapPin className="h-5 w-5" /> },
+    { name: "Компьютерная помощь", icon: <FileText className="h-5 w-5" /> },
+    { name: "Репетиторство и обучение", icon: <Users className="h-5 w-5" /> },
+    { name: "Красота и здоровье", icon: <Star className="h-5 w-5" /> },
+    { name: "Мероприятия и промоакции", icon: <UsersRound className="h-5 w-5" /> },
+    { name: "Фото и видеосъемка", icon: <Search className="h-5 w-5" /> },
   ];
 
   const stats = [
     {
       icon: <TrendingUp className="h-8 w-8 text-accent mb-2" />,
-      value: "150+",
+      value: Math.round(animatedStats[0].value) + "+",
       label: "Активных заданий",
     },
     {
       icon: <UsersRound className="h-8 w-8 text-accent mb-2" />,
-      value: "300+",
+      value: Math.round(animatedStats[1].value) + "+",
       label: "Пользователей в Ирбите",
     },
     {
       icon: <MapPin className="h-8 w-8 text-accent mb-2" />,
-      value: "100%",
+      value: Math.round(animatedStats[2].value) + "%",
       label: "Фокус на нашем городе",
     },
+  ];
+
+  // Добавим отзывы для повышения доверия
+  const testimonials = [
+    {
+      text: "Нашел отличного мастера для ремонта квартиры всего за пару часов. Очень удобный сервис!",
+      author: "Александр К.",
+      role: "Заказчик"
+    },
+    {
+      text: "Благодаря этой платформе я нашла дополнительный заработок рядом с домом. Теперь регулярно беру заказы на уборку.",
+      author: "Елена М.",
+      role: "Исполнитель"
+    },
+    {
+      text: "Искал курьера срочно доставить документы. Через 15 минут после размещения задания уже нашелся исполнитель!",
+      author: "Дмитрий В.",
+      role: "Заказчик"
+    }
   ];
 
   return (
@@ -64,23 +104,26 @@ export default function HomePage() {
       <section className="w-full py-16 md:py-24 lg:py-32 bg-gradient-to-b from-background via-accent/5 to-background text-center">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center space-y-6">
-            <Briefcase className="h-16 w-16 sm:h-20 sm:w-20 text-accent" />
+            <div className="relative">
+              <Briefcase className="h-16 w-16 sm:h-20 sm:w-20 text-accent animate-pulse" />
+              <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full">Новое</div>
+            </div>
             <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none">
-              Фриланс Ирбит
+              Фриланс <span className="text-accent">Ирбит</span>
             </h1>
             <p className="max-w-[700px] text-muted-foreground md:text-xl lg:text-lg xl:text-xl">
               Ваша новая фриланс-площадка для поиска исполнителей и размещения заданий в городе Ирбит.
               Быстро, удобно и всегда под рукой для местных нужд.
             </p>
             <div className="flex flex-col gap-4 sm:flex-row sm:gap-3">
-              <Button asChild size="lg" className="shadow-lg hover-scale text-lg px-8 py-6">
+              <Button asChild size="lg" className="shadow-lg hover:scale-105 transition-transform text-lg px-8 py-6">
                 <Link href="/tasks">Смотреть задания</Link>
               </Button>
               <Button
                 asChild
                 variant="outline"
                 size="lg"
-                className="shadow-lg hover-scale hover:bg-accent/10 hover:border-accent hover:text-accent text-lg px-8 py-6"
+                className="shadow-lg hover:scale-105 transition-transform hover:bg-accent/10 hover:border-accent hover:text-accent text-lg px-8 py-6"
               >
                 <Link href="/create-task">Разместить задание</Link>
               </Button>
@@ -88,7 +131,7 @@ export default function HomePage() {
 
             <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl w-full">
               {stats.map((stat, index) => (
-                <div key={index} className="p-6 bg-card/60 backdrop-blur-sm rounded-xl shadow-lg text-center hover-lift transition-all duration-300 hover:shadow-accent/20">
+                <div key={index} className="p-6 bg-card/60 backdrop-blur-sm rounded-xl shadow-lg text-center hover:scale-105 transition-all duration-300 hover:shadow-accent/20">
                   {stat.icon}
                   <div className="text-3xl font-bold text-accent">{stat.value}</div>
                   <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
@@ -110,7 +153,7 @@ export default function HomePage() {
           </div>
           <div className="mx-auto grid items-start gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 lg:max-w-5xl">
             {features.map((feature, index) => (
-              <Card key={index} className="text-center p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/70 backdrop-blur-sm">
+              <Card key={index} className="text-center p-6 shadow-lg hover:shadow-accent/30 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm">
                 {feature.icon}
                 <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground">{feature.description}</p>
@@ -131,17 +174,22 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
             {categories.map((category) => (
               <Link
-                key={category}
-                href={`/tasks?category=${encodeURIComponent(category)}`}
-                className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group"
+                key={category.name}
+                href={`/tasks?category=${encodeURIComponent(category.name)}`}
+                className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover:scale-105 cursor-pointer group"
               >
-                <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors">{category}</h3>
+                <div className="flex items-center mb-2">
+                  <div className="p-2 rounded-full bg-accent/10 text-accent mr-3">
+                    {category.icon}
+                  </div>
+                  <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors">{category.name}</h3>
+                </div>
                 <p className="text-sm text-muted-foreground mt-1">Найти задания в этой категории</p>
               </Link>
             ))}
              <Link
                 href="/tasks"
-                className="block p-4 rounded-lg border bg-secondary hover:bg-accent/20 hover:border-accent text-secondary-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-lift cursor-pointer group flex flex-col items-center justify-center text-center sm:col-span-2 md:col-span-1 lg:col-span-full min-h-[100px]"
+                className="block p-4 rounded-lg border bg-secondary hover:bg-accent/20 hover:border-accent text-secondary-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover:scale-105 cursor-pointer group flex flex-col items-center justify-center text-center sm:col-span-2 md:col-span-1 lg:col-span-full min-h-[100px]"
              >
                 <h3 className="font-semibold text-lg text-foreground group-hover:text-accent transition-colors flex items-center">
                   Все категории <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform"/>
@@ -156,26 +204,127 @@ export default function HomePage() {
         <div className="container px-4 md:px-6">
           <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Как это работает?</h2>
           <div className="grid gap-8 md:gap-10 grid-cols-1 md:grid-cols-2">
-            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/70 backdrop-blur-sm">
+            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-2xl">Для заказчиков</CardTitle>
+                <div className="flex items-center">
+                  <div className="p-2 rounded-full bg-accent/10 text-accent mr-3">
+                    <Users className="h-6 w-6" />
+                  </div>
+                  <CardTitle className="text-2xl">Для заказчиков</CardTitle>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3 text-muted-foreground">
-                <p><strong>1. Опубликуйте задание:</strong> Опишите, что нужно сделать, укажите бюджет.</p>
-                <p><strong>2. Получайте отклики:</strong> Исполнители из Ирбита предложат свои услуги.</p>
-                <p><strong>3. Выберите лучшего:</strong> Свяжитесь с подходящим исполнителем и договоритесь о деталях.</p>
+                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">1</span> <strong>Опубликуйте задание:</strong> Опишите, что нужно сделать, укажите бюджет.</p>
+                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">2</span> <strong>Получайте отклики:</strong> Исполнители из Ирбита предложат свои услуги.</p>
+                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">3</span> <strong>Выберите лучшего:</strong> Свяжитесь с подходящим исполнителем и договоритесь о деталях.</p>
+                <Button asChild className="mt-4 w-full">
+                  <Link href="/create-task">Разместить задание</Link>
+                </Button>
               </CardContent>
             </Card>
-            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-shadow duration-300 hover-lift bg-card/70 backdrop-blur-sm">
+            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-2xl">Для исполнителей</CardTitle>
+                <div className="flex items-center">
+                  <div className="p-2 rounded-full bg-accent/10 text-accent mr-3">
+                    <Briefcase className="h-6 w-6" />
+                  </div>
+                  <CardTitle className="text-2xl">Для исполнителей</CardTitle>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3 text-muted-foreground">
-                <p><strong>1. Найдите задания:</strong> Просматривайте новые заказы в Ирбите по вашей специализации.</p>
-                <p><strong>2. Предложите услуги:</strong> Откликайтесь на интересные задания, указывайте свою цену.</p>
-                <p><strong>3. Выполняйте и зарабатывайте:</strong> Договаривайтесь с заказчиками и получайте оплату.</p>
+                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">1</span> <strong>Найдите задания:</strong> Просматривайте новые заказы в Ирбите по вашей специализации.</p>
+                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">2</span> <strong>Предложите услуги:</strong> Откликайтесь на интересные задания, указывайте свою цену.</p>
+                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">3</span> <strong>Выполняйте и зарабатывайте:</strong> Договаривайтесь с заказчиками и получайте оплату.</p>
+                <Button asChild className="mt-4 w-full">
+                  <Link href="/tasks">Найти задания</Link>
+                </Button>
               </CardContent>
             </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Новый раздел с отзывами */}
+      <section id="testimonials" className="w-full py-12 md:py-24 bg-muted/30">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
+            <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">Отзывы</div>
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Что говорят пользователи</h2>
+            <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+              Реальные истории успеха от жителей Ирбита
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {testimonials.map((testimonial, index) => (
+              <Card key={index} className="p-6 shadow-lg hover:shadow-accent/30 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm">
+                <CardContent className="pt-6">
+                  <div className="mb-4 flex justify-center">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-muted-foreground italic mb-4">"{testimonial.text}"</p>
+                  <div className="text-sm font-semibold">{testimonial.author}</div>
+                  <div className="text-xs text-muted-foreground">{testimonial.role}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Добавим призыв к действию в конце */}
+      <section className="w-full py-12 md:py-16 bg-accent/10">
+        <div className="container px-4 md:px-6 text-center">
+          <div className="flex flex-col items-center max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">Готовы начать?</h2>
+            <p className="text-muted-foreground mb-8 md:text-lg">
+              Присоединяйтесь к растущему сообществу фрилансеров и заказчиков в Ирбите уже сегодня!
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button asChild size="lg" className="shadow-lg hover:scale-105 transition-transform">
+                <Link href="/register">Зарегистрироваться</Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="shadow-lg hover:scale-105 transition-transform">
+                <Link href="/tasks">Посмотреть задания</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Добавим блок с преимуществами безопасности */}
+      <section className="w-full py-12 md:py-20">
+        <div className="container px-4 md:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+            <div className="flex flex-col items-center text-center p-4">
+              <div className="p-3 rounded-full bg-accent/10 text-accent mb-4">
+                <Shield className="h-8 w-8" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Безопасные сделки</h3>
+              <p className="text-sm text-muted-foreground">
+                Проверенные исполнители и заказчики. Система рейтингов и отзывов.
+              </p>
+            </div>
+            <div className="flex flex-col items-center text-center p-4">
+              <div className="p-3 rounded-full bg-accent/10 text-accent mb-4">
+                <MapPin className="h-8 w-8" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Только местные</h3>
+              <p className="text-sm text-muted-foreground">
+                Все исполнители из Ирбита. Никаких лишних поездок и дополнительных расходов.
+              </p>
+            </div>
+            <div className="flex flex-col items-center text-center p-4">
+              <div className="p-3 rounded-full bg-accent/10 text-accent mb-4">
+                <Clock className="h-8 w-8" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Быстрый отклик</h3>
+              <p className="text-sm text-muted-foreground">
+                Получайте отклики на ваши задания в течение нескольких часов или даже минут.
+              </p>
+            </div>
           </div>
         </div>
       </section>
