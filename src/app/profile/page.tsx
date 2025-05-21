@@ -1,3 +1,4 @@
+
 // src/app/profile/page.tsx
 "use client";
 
@@ -5,34 +6,74 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, MessageSquare, Clock, ListChecks } from "lucide-react"; // Added Clock, ListChecks
-import { useState, useEffect } from 'react';
-import { auth } from '@/lib/firebase';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, Clock, ListChecks, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback } from 'react';
+import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
+import { doc, getDoc, DocumentSnapshot } from "firebase/firestore";
 import Link from "next/link";
+import EditProfileForm from "@/components/profile/edit-profile-form";
+import type { UserProfile, EditUserProfileFormValues } from "@/lib/schemas";
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [userProfile, setUserProfile] = useState<Partial<UserProfile> | null>(null); // Partial, т.к. профиль может быть не полностью заполнен
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  const fetchUserProfile = useCallback(async (currentUser: User) => {
+    if (!db || !currentUser?.uid) return;
+    setIsLoadingProfile(true);
+    try {
+      const profileRef = doc(db, "userProfiles", currentUser.uid);
+      const profileSnap: DocumentSnapshot<Omit<UserProfile, 'uid' | 'registrationDate' | 'lastSignInTime'>> = await getDoc(profileRef) as DocumentSnapshot<Omit<UserProfile, 'uid' | 'registrationDate' | 'lastSignInTime'>>;
+      if (profileSnap.exists()) {
+        setUserProfile(profileSnap.data());
+      } else {
+        setUserProfile(null); // Профиль еще не создан
+        console.log("No such user profile!");
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      setUserProfile(null);
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!auth) {
-        console.warn("Firebase auth instance is not available in ProfilePage.");
-        setIsLoadingAuth(false);
-        return;
+      console.warn("Firebase auth instance is not available in ProfilePage.");
+      setIsLoadingAuth(false);
+      return;
     }
-    const unsubscribe = auth.onAuthStateChanged(currentUser => {
+    const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
       setIsLoadingAuth(false);
+      if (currentUser) {
+        await fetchUserProfile(currentUser);
+      } else {
+        setUserProfile(null); // Сбрасываем профиль если пользователь вышел
+        setIsLoadingProfile(false);
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [fetchUserProfile]);
 
-  if (isLoadingAuth) {
+  const handleProfileUpdateSuccess = (updatedData: EditUserProfileFormValues) => {
+    // Оптимистичное обновление или повторная загрузка
+    setUserProfile(prev => ({ ...prev, ...updatedData, uid: user?.uid, email: user?.email || undefined, displayName: user?.displayName || undefined, photoURL: user?.photoURL || undefined }));
+    setIsEditDialogOpen(false);
+    // Для полной синхронизации можно вызвать fetchUserProfile(user!) снова, но это лишний запрос если данные уже есть
+  };
+
+  if (isLoadingAuth || (user && isLoadingProfile)) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
         <div className="text-center p-4">
-          <UserCircle className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground animate-pulse" />
+          <Loader2 className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-accent animate-spin" />
           <p className="mt-4 text-lg sm:text-xl text-muted-foreground">Загрузка профиля...</p>
         </div>
       </div>
@@ -74,21 +115,22 @@ export default function ProfilePage() {
         <CardHeader className="items-center text-center border-b pb-6 bg-muted/20 p-6 sm:p-8">
           <div className="relative mb-4">
             <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-4 border-accent shadow-lg">
-              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="user avatar large" />
+              <AvatarImage src={userProfile?.photoURL || user.photoURL || undefined} alt={userProfile?.displayName || user.displayName || "User"} data-ai-hint="user avatar large" />
               <AvatarFallback className="text-4xl sm:text-5xl bg-muted/50">
-                {user.displayName ? user.displayName.charAt(0).toUpperCase() : <UserCircle className="h-16 w-16"/>}
+                {(userProfile?.displayName || user.displayName) ? (userProfile?.displayName || user.displayName)!.charAt(0).toUpperCase() : <UserCircle className="h-16 w-16"/>}
               </AvatarFallback>
             </Avatar>
+            {/* Кнопка редактирования фото пока не активна, но оставим для UI */}
             <Button variant="outline" size="icon" className="absolute bottom-1 right-1 h-8 w-8 rounded-full bg-background hover:bg-accent/10 border-accent/50 text-accent hover:text-accent shadow-md" title="Редактировать фото (в разработке)">
               <Edit className="h-4 w-4" />
               <span className="sr-only">Редактировать фото</span>
             </Button>
           </div>
-          <CardTitle className="text-2xl sm:text-3xl font-bold">{user.displayName || "Пользователь"}</CardTitle>
-          <CardDescription className="text-md text-muted-foreground pt-1">Ирбит, Россия (заглушка) • 38 лет (заглушка)</CardDescription> 
+          <CardTitle className="text-2xl sm:text-3xl font-bold">{userProfile?.displayName || user.displayName || "Пользователь"}</CardTitle>
+          <CardDescription className="text-md text-muted-foreground pt-1">{userProfile?.city || "Ирбит (заглушка)"} • {userProfile?.age ? `${userProfile.age} лет` : "Возраст не указан (заглушка)"}</CardDescription> 
           <div className="flex flex-wrap gap-2 mt-4 justify-center">
-            <Badge variant="secondary" className="text-sm py-1 px-3 bg-green-600/20 text-green-400 border-green-500/40">Исполнитель (статус)</Badge>
-            <Badge variant="secondary" className="text-sm py-1 px-3 bg-blue-600/20 text-blue-400 border-blue-500/40">Проверен (статус)</Badge>
+            <Badge variant="secondary" className="text-sm py-1 px-3 bg-green-600/20 text-green-400 border-green-500/40">Исполнитель (статус-заглушка)</Badge>
+            <Badge variant="secondary" className="text-sm py-1 px-3 bg-blue-600/20 text-blue-400 border-blue-500/40">Проверен (заглушка)</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-6 sm:p-8 space-y-6">
@@ -101,13 +143,13 @@ export default function ProfilePage() {
                 Email: <span className="ml-1 font-medium text-foreground/90">{user.email || "Не указан"}</span> 
                 {user.emailVerified && (
                   <span title="Email подтвержден">
-                    <ShieldCheck className="h-4 w-4 ml-2 text-green-400" aria-label="Email подтвержден" />
+                    <ShieldCheck className="h-4 w-4 ml-2 text-green-400" />
                   </span>
                 )}
               </p>
               <p className="flex items-center"><CalendarDays className="h-4 w-4 mr-2.5 text-accent/80" />Дата регистрации: <span className="ml-1 font-medium text-foreground/90">{registrationDate}</span></p>
-              <p className="flex items-center"><Clock className="h-4 w-4 mr-2.5 text-accent/80" />Был(а) на сайте: <span className="ml-1 font-medium text-foreground/90">{lastSignInDate} (реально)</span></p>
-              <p className="text-xs mt-1">Подтверждения: Email, Телефон, Соцсеть (заглушка)</p>
+              <p className="flex items-center"><Clock className="h-4 w-4 mr-2.5 text-accent/80" />Был(а) на сайте: <span className="ml-1 font-medium text-foreground/90">{lastSignInDate}</span></p>
+              {/* <p className="text-xs mt-1">Подтверждения: Email, Телефон, Соцсеть (заглушка)</p> */}
             </div>
           </section>
 
@@ -125,6 +167,26 @@ export default function ProfilePage() {
             </div>
           </section>
 
+          <section>
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><Briefcase className="h-6 w-6 mr-2.5 text-accent"/>О себе</h3>
+            {isLoadingProfile && <p className="text-sm text-muted-foreground pl-8">Загрузка информации...</p>}
+            {!isLoadingProfile && userProfile?.aboutMe && <p className="text-sm text-muted-foreground pl-8 whitespace-pre-line">{userProfile.aboutMe}</p>}
+            {!isLoadingProfile && !userProfile?.aboutMe && <p className="text-sm text-muted-foreground pl-8 italic">Информация о себе еще не добавлена.</p>}
+          </section>
+
+           <section>
+            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><ListChecks className="h-6 w-6 mr-2.5 text-accent"/>Специализации</h3>
+            {isLoadingProfile && <p className="text-sm text-muted-foreground pl-8">Загрузка специализаций...</p>}
+            {!isLoadingProfile && userProfile?.specializations && userProfile.specializations.length > 0 && (
+              <div className="flex flex-wrap gap-2 pl-8">
+                {userProfile.specializations.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>)}
+              </div>
+            )}
+            {!isLoadingProfile && (!userProfile?.specializations || userProfile.specializations.length === 0) && (
+              <p className="text-sm text-muted-foreground pl-8 italic">Специализации еще не выбраны.</p>
+            )}
+          </section>
+          
           <section>
             <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><Star className="h-6 w-6 mr-2.5 text-accent"/>Рейтинг и Отзывы (заглушка)</h3>
             <div className="pl-8 space-y-4">
@@ -149,24 +211,37 @@ export default function ProfilePage() {
               </Card>
             </div>
           </section>
-          
-          <section className="border-t pt-6 mt-6">
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><Briefcase className="h-6 w-6 mr-2.5 text-accent"/>О себе (в разработке)</h3>
-            <p className="text-sm text-muted-foreground pl-8">Здесь будет ваше описание, навыки и опыт. Вы сможете отредактировать эту информацию позже.</p>
-          </section>
-
-           <section className="border-t pt-6 mt-6">
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><ListChecks className="h-6 w-6 mr-2.5 text-accent"/>Специализации (в разработке)</h3>
-            <p className="text-sm text-muted-foreground pl-8">Укажите категории услуг, которые вы предоставляете.</p>
-          </section>
 
         </CardContent>
         <CardFooter className="border-t p-6 sm:p-8">
-            <Button className="w-full hover-scale text-base py-3">
-                <Edit className="h-5 w-5 mr-2" /> Редактировать профиль (в разработке)
-            </Button>
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full hover-scale text-base py-3">
+                    <Edit className="h-5 w-5 mr-2" /> Редактировать профиль
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl">Редактирование профиля</DialogTitle>
+                    <DialogDescription>
+                      Обновите информацию о себе и своих специализациях.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="overflow-y-auto pr-2"> {/* Добавляем прокрутку для контента формы */}
+                    {user && (
+                        <EditProfileForm 
+                            currentUser={user} 
+                            initialProfileData={userProfile || {}} // Передаем пустой объект, если профиля нет
+                            onProfileUpdated={handleProfileUpdateSuccess}
+                            onCancel={() => setIsEditDialogOpen(false)}
+                        />
+                    )}
+                  </div>
+              </DialogContent>
+            </Dialog>
         </CardFooter>
       </Card>
     </div>
   );
 }
+

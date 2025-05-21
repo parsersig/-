@@ -1,0 +1,172 @@
+
+// src/components/profile/edit-profile-form.tsx
+"use client";
+
+import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { db } from "@/lib/firebase";
+import { doc, setDoc } from "firebase/firestore";
+import type { User } from "firebase/auth";
+import { taskCategories, editUserProfileSchema, type EditUserProfileFormValues, type UserProfile } from "@/lib/schemas";
+import { Loader2 } from "lucide-react";
+
+interface EditProfileFormProps {
+  currentUser: User;
+  initialProfileData: Partial<UserProfile> | null; // Partial, так как профиль может быть не полностью заполнен
+  onProfileUpdated: (updatedData: EditUserProfileFormValues) => void;
+  onCancel: () => void;
+}
+
+export default function EditProfileForm({ currentUser, initialProfileData, onProfileUpdated, onCancel }: EditProfileFormProps) {
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const form = useForm<EditUserProfileFormValues>({
+    resolver: zodResolver(editUserProfileSchema),
+    defaultValues: {
+      aboutMe: initialProfileData?.aboutMe || "",
+      specializations: initialProfileData?.specializations || [],
+    },
+  });
+
+  async function onSubmit(data: EditUserProfileFormValues) {
+    if (!db || !currentUser?.uid) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось подключиться к базе данных или пользователь не найден.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const profileRef = doc(db, "userProfiles", currentUser.uid);
+      await setDoc(profileRef, {
+        ...initialProfileData, // Сохраняем существующие данные профиля
+        ...data, // Обновляем поля из формы
+        uid: currentUser.uid, // Убедимся, что UID присутствует
+        email: currentUser.email, // Обновляем/сохраняем email
+        displayName: currentUser.displayName, // Обновляем/сохраняем displayName
+        photoURL: currentUser.photoURL // Обновляем/сохраняем photoURL
+      }, { merge: true }); // merge: true очень важен, чтобы не затереть другие поля профиля
+
+      toast({
+        title: "Профиль обновлен",
+        description: "Ваши данные успешно сохранены.",
+      });
+      onProfileUpdated(data); // Передаем обновленные данные обратно и закрываем диалог
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        title: "Ошибка обновления",
+        description: `Не удалось сохранить изменения. ${error instanceof Error ? error.message : ""}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormField
+          control={form.control}
+          name="aboutMe"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-lg">О себе</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Расскажите немного о себе, вашем опыте, чем можете быть полезны..."
+                  className="min-h-[100px] text-base"
+                  {...field}
+                />
+              </FormControl>
+              <FormDescription>
+                Эта информация будет видна другим пользователям в вашем профиле.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="specializations"
+          render={() => (
+            <FormItem>
+              <div className="mb-3">
+                <FormLabel className="text-lg">Ваши специализации</FormLabel>
+                <FormDescription>
+                  Выберите категории услуг, в которых вы специализируетесь.
+                </FormDescription>
+              </div>
+              <ScrollArea className="h-72 w-full rounded-md border p-3 bg-muted/20">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                {taskCategories.map((category) => (
+                  <FormField
+                    key={category}
+                    control={form.control}
+                    name="specializations"
+                    render={({ field }) => {
+                      return (
+                        <FormItem
+                          key={category}
+                          className="flex flex-row items-center space-x-2 space-y-0 py-1.5 px-2 rounded-md hover:bg-muted/40 transition-colors"
+                        >
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(category)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...(field.value || []), category])
+                                  : field.onChange(
+                                      (field.value || []).filter(
+                                        (value) => value !== category
+                                      )
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="text-sm font-normal cursor-pointer select-none">
+                            {category}
+                          </FormLabel>
+                        </FormItem>
+                      );
+                    }}
+                  />
+                ))}
+                </div>
+              </ScrollArea>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+                Отмена
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="min-w-[120px]">
+            {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Сохранить"}
+            </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
