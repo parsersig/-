@@ -21,16 +21,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { taskSchema, type TaskFormValues, taskCategories } from "@/lib/schemas";
-import { FileText, DollarSign, ListChecks, UserCircle, Edit3, ExternalLink } from 'lucide-react';
+import { FileText, DollarSign, ListChecks, UserCircle, Edit3, ExternalLink, LogIn } from 'lucide-react'; // Added LogIn
 import { auth, db } from "@/lib/firebase";
-import { useState, useEffect } from "react";
-import type { User } from "firebase/auth";
+import { useState, useEffect, useCallback } from "react"; // Added useCallback
+import type { User, UserCredential } from "firebase/auth"; // Added UserCredential
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth"; // Added GoogleAuthProvider, signInWithPopup
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useRouter } from 'next/navigation'; // Added useRouter
 
 export default function CreateTaskPage() {
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter(); // Initialize useRouter
 
   useEffect(() => {
     if (auth) {
@@ -52,6 +55,30 @@ export default function CreateTaskPage() {
       contactInfo: "",
     },
   });
+
+  const handleLogin = useCallback(async () => {
+    if (!auth) {
+      toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
+      return;
+    }
+    try {
+      const result: UserCredential = await signInWithPopup(auth, new GoogleAuthProvider());
+      toast({ title: "Вход выполнен", description: "Вы успешно вошли в систему." });
+      // Пользователь будет перенаправлен или состояние обновится, и форма станет доступной
+      // Если это новый пользователь, можно перенаправить на /post-registration
+      // @ts-ignore firebase-9-compat
+      if (result.additionalUserInfo?.isNewUser || result._tokenResponse?.isNewUser) {
+         router.push('/post-registration');
+      }
+    } catch (error: any) {
+      console.error("Firebase login error on CreateTaskPage:", error);
+      toast({
+        title: "Ошибка входа",
+        description: error.message || "Не удалось войти через Google. Попробуйте еще раз.",
+        variant: "destructive",
+      });
+    }
+  }, [toast, router]);
 
   async function onSubmit(data: TaskFormValues) {
     setIsSubmitting(true);
@@ -76,36 +103,43 @@ export default function CreateTaskPage() {
     }
 
     try {
-      // Явно проверяем и логируем userId
       if (currentUser && currentUser.uid) {
         console.log("Saving task with userId:", currentUser.uid);
       } else {
-        console.error("currentUser.uid is undefined or null");
+        console.error("currentUser.uid is undefined or null, cannot save task");
+        toast({
+          title: "Ошибка пользователя",
+          description: "Не удалось определить ID пользователя. Попробуйте войти заново.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
       }
       
       const docRef = await addDoc(collection(db, "tasks"), {
         ...data,
-        userId: currentUser.uid, // Убедимся, что userId сохраняется
+        userId: currentUser.uid,
         postedDate: serverTimestamp(),
-        city: "Ирбит", // Пока оставляем город по умолчанию
+        city: "Ирбит", 
         views: 0,
+        status: 'open', // Default status
       });
       console.log("Task saved to Firestore with ID:", docRef.id);
 
-      // Создаем запись-уведомление
-      try {
-        await addDoc(collection(db, "notifications"), {
-          taskId: docRef.id,
-          taskTitle: data.title,
-          message: `Новое задание опубликовано: "${data.title}"`,
-          createdAt: serverTimestamp(),
-          read: false, // Опционально: для отслеживания прочитанных уведомлений
-          type: "new_task", // Опционально: для типизации уведомлений
-        });
-        console.log("Notification entry created for new task ID:", docRef.id);
-      } catch (notifError) {
-        console.error("Failed to create notification entry:", notifError);
-        // Не блокируем пользователя, если уведомление не создалось, но логируем
+      if (db) { // Check if db is available for notifications
+        try {
+          await addDoc(collection(db, "notifications"), {
+            taskId: docRef.id,
+            taskTitle: data.title,
+            message: `Новое задание опубликовано: "${data.title}"`,
+            createdAt: serverTimestamp(),
+            read: false, 
+            type: "new_task", 
+          });
+          console.log("Notification entry created for new task ID:", docRef.id);
+        } catch (notifError) {
+          console.error("Failed to create notification entry:", notifError);
+        }
       }
 
       toast({
@@ -288,12 +322,19 @@ export default function CreateTaskPage() {
                   </FormItem>
                 )}
               />
-
-              <Button type="submit" size="lg" className="w-full md:w-auto min-w-[180px] sm:min-w-[200px] text-md sm:text-lg h-12 sm:h-14 mt-6 sm:mt-8 shadow-lg hover-scale" disabled={isSubmitting || !currentUser}>
-                {isSubmitting ? "Публикация..." : "Опубликовать задание"}
-              </Button>
-              {!currentUser && (
-                <p className="text-sm text-destructive text-center mt-2">Для публикации задания необходимо войти в систему.</p>
+              
+              {/* Условное отображение кнопки отправки или сообщения о необходимости входа */}
+              {!currentUser ? (
+                <div className="text-center space-y-3 pt-4">
+                  <p className="text-sm text-destructive">Для публикации задания необходимо войти в систему.</p>
+                  <Button type="button" onClick={handleLogin} className="w-full md:w-auto min-w-[180px] sm:min-w-[200px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale">
+                    <LogIn className="mr-2 h-5 w-5" /> Войти / Зарегистрироваться
+                  </Button>
+                </div>
+              ) : (
+                <Button type="submit" size="lg" className="w-full md:w-auto min-w-[180px] sm:min-w-[200px] text-md sm:text-lg h-12 sm:h-14 mt-6 sm:mt-8 shadow-lg hover-scale" disabled={isSubmitting}>
+                  {isSubmitting ? "Публикация..." : "Опубликовать задание"}
+                </Button>
               )}
             </form>
           </Form>
