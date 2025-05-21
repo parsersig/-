@@ -14,12 +14,12 @@ export default function PostRegistrationPage() {
         <CardHeader className="text-center">
           <div className="mx-auto mb-6">
             <Image
-              src="https://placehold.co/200x150.png" // Замените на подходящую иллюстрацию
+              src="https://placehold.co/200x150.png" // Placeholder image
               alt="Приветственная иллюстрация"
               width={200}
               height={150}
               className="rounded-lg"
-              data-ai-hint="welcome celebration"
+              data-ai-hint="welcome celebration" // AI hint for future image selection
             />
           </div>
           <CardTitle className="text-3xl font-bold">Спасибо за регистрацию!</CardTitle>
