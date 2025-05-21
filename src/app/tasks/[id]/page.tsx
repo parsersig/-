@@ -1,4 +1,3 @@
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -15,7 +14,8 @@ import { db, auth } from "@/lib/firebase";
 import { 
   doc, getDoc, updateDoc, increment, Timestamp, 
   collection, addDoc, serverTimestamp, query, where, 
-  orderBy, onSnapshot, QuerySnapshot, QueryDocumentSnapshot, FirestoreError, Firestore // Добавлен Firestore для типа
+  orderBy, onSnapshot, getDocs, // <--- getDocs добавлен сюда
+  type QuerySnapshot, type QueryDocumentSnapshot, type FirestoreError, type Firestore 
 } from "firebase/firestore";
 import type { User as FirebaseUser } from "firebase/auth";
 
@@ -419,4 +419,3 @@ export default function TaskDetailPage() {
     </div>
   );
 }
-

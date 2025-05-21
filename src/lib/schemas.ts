@@ -1,6 +1,5 @@
-
 import { z } from 'zod';
-import type { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore'; // Изменено: убрано ключевое слово 'type'
 
 export const taskCategories = [
   "Ремонт и строительство", 
