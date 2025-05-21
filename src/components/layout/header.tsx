@@ -1,8 +1,7 @@
-// src/components/layout/header.tsx
 "use client";
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Импортируем useRouter
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Briefcase,
@@ -24,13 +23,9 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
   SheetTrigger,
   SheetClose,
 } from "@/components/ui/sheet";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,7 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { auth, db } from '@/lib/firebase'; // Убедимся, что db импортирован, если нужен для других целей
+import { auth, db } from '@/lib/firebase';
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, type User } from 'firebase/auth';
 
 interface NavLink {
@@ -68,7 +63,7 @@ export default function Header() {
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const router = useRouter(); // Инициализируем router
+  const router = useRouter();
 
   useEffect(() => {
     if (!auth) {
@@ -99,8 +94,9 @@ export default function Header() {
       toast({ title: "Вход выполнен", description: "Вы успешно вошли в систему." });
       setIsMobileMenuOpen(false);
       // Проверяем, новый ли это пользователь
+      // @ts-ignore - additionalUserInfo доступен, но не включен в типы TypeScript
       if (result.additionalUserInfo?.isNewUser) {
-        router.push('/post-registration'); // Перенаправляем на новую страницу
+        router.push('/post-registration');
       }
     } catch (error: any) {
       console.error("Firebase login error:", error);
@@ -109,8 +105,6 @@ export default function Header() {
         description: error.message || "Не удалось войти через Google. Попробуйте еще раз.",
         variant: "destructive",
       });
-    } finally {
-      // setIsLoadingAuth(false); // Это уже делается в onAuthStateChanged
     }
   }, [toast, router]);
 
@@ -119,7 +113,6 @@ export default function Header() {
       toast({ title: "Ошибка", description: "Сервис аутентификации недоступен.", variant: "destructive" });
       return;
     }
-    // setIsLoadingAuth(true); // Не обязательно здесь, т.к. onAuthStateChanged отреагирует
     try {
       await signOut(auth);
       toast({ title: "Выход выполнен", description: "Вы успешно вышли из системы." });
@@ -131,8 +124,6 @@ export default function Header() {
         description: error.message || "Не удалось выйти из системы.",
         variant: "destructive",
       });
-    } finally {
-      // setIsLoadingAuth(false); // Это уже делается в onAuthStateChanged
     }
   }, [toast]);
   
@@ -235,19 +226,8 @@ export default function Header() {
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent 
-              side="right" 
-              className="w-[280px] sm:w-[320px] pt-10 px-4"
-              aria-labelledby="mobile-menu-title"
-              aria-describedby="mobile-menu-description"
-            >
-              <SheetHeader>
-                <VisuallyHidden>
-                  <SheetTitle id="mobile-menu-title">Главное меню навигации</SheetTitle>
-                  <SheetDescription id="mobile-menu-description">Выберите раздел сайта Фриланс Ирбит.</SheetDescription>
-                </VisuallyHidden>
-              </SheetHeader>
-              <nav className="flex flex-col space-y-2 mt-4"> {/* Добавлен mt-4 для отступа от скрытого заголовка */}
+            <SheetContent side="right" className="w-[280px] sm:w-[320px] pt-10 px-4">
+              <nav className="flex flex-col space-y-2 mt-4">
                 <SheetClose asChild>
                   <Link 
                     href="/"
