@@ -75,7 +75,7 @@ export default function MyResponsesPage() {
     
     setIsLoadingResponses(true);
     setError(null);
-    setUserResponses([]); // Очищаем предыдущие результаты перед новым запросом
+    setUserResponses([]); 
     
     try {
       console.log(`Fetching responses for userId: ${userId}, attemptFallback: ${attemptFallback}`);
@@ -87,7 +87,7 @@ export default function MyResponsesPage() {
             where("responderId", "==", userId), 
             orderBy("respondedAt", "desc")
           )
-        : query( // Запрос без orderBy для фоллбэка
+        : query( 
             responsesRef,
             where("responderId", "==", userId)
           );
@@ -101,17 +101,15 @@ export default function MyResponsesPage() {
           id: doc.id,
           taskId: data.taskId,
           taskTitle: data.taskTitle,
-          taskCategory: data.taskCategory, // Убедимся, что это поле есть в данных отклика
+          taskCategory: data.taskCategory, 
           responderId: data.responderId,
-          respondedAt: formatDate(data.respondedAt), // Форматируем дату сразу
-          firestoreRespondedAt: data.respondedAt, // Сохраняем оригинал для возможной сортировки на клиенте
+          respondedAt: formatDate(data.respondedAt),
+          firestoreRespondedAt: data.respondedAt,
           status: data.status,
-          responseMessage: data.responseMessage || data.message || data.comment // Учитываем разные возможные имена поля
+          responseMessage: data.responseMessage || data.message || data.comment
         });
       });
       
-      // Если основной запрос (с orderBy) не удался и мы использовали фоллбэк без сортировки,
-      // то сортируем на клиенте.
       if (!attemptFallback && responses.length > 0) {
         responses.sort((a, b) => {
           const dateA = a.firestoreRespondedAt instanceof Timestamp 
@@ -127,24 +125,24 @@ export default function MyResponsesPage() {
       setUserResponses(responses);
       
     } catch (err: any) {
-      const firestoreError = err as FirestoreError;
-      console.error("Error fetching user responses:", firestoreError);
+      const caughtError = err as FirestoreError; // Используем новую переменную
+      console.error("Error fetching user responses:", caughtError);
       
-      if (attemptFallback && firestoreError.code === 'failed-precondition' && firestoreError.message.includes('index')) {
-        setError("Для корректной сортировки откликов требуется создание индекса в Firebase. Пытаюсь загрузить данные без сортировки...");
-        // Попытка загрузить данные без сортировки (без orderBy)
-        fetchUserResponses(userId, false); // Вызываем эту же функцию, но с флагом attemptFallback = false
-        return; // Выходим, чтобы не вызывать setIsLoadingResponses(false) дважды
-      } else if (!attemptFallback && firestoreError.code === 'failed-precondition') {
-        // Ошибка даже при фоллбэк запросе, вероятно, проблема с where("responderId", ...)
-         setError(`Ошибка загрузки данных: ${firestoreError.message}. Возможно, требуется другой индекс.`);
+      if (attemptFallback && caughtError.code === 'failed-precondition' && caughtError.message.includes('index')) {
+        setError("Для корректной работы этой страницы требуется создание индекса в Firebase Firestore. Пытаюсь загрузить данные без сортировки... Пожалуйста, создайте рекомендованный индекс, перейдя по ссылке из консоли ошибок.");
+        fetchUserResponses(userId, false); 
+        return; 
+      } else if (!attemptFallback && caughtError.code === 'failed-precondition') {
+         setError(`Ошибка загрузки данных: ${caughtError.message}. Возможно, требуется создание или изменение индекса в Firestore. Пожалуйста, проверьте консоль ошибок на наличие ссылки для создания индекса.`);
       } else {
-        setError(`Произошла ошибка при загрузке откликов: ${firestoreError.message || 'Неизвестная ошибка'}`);
+        setError(`Произошла ошибка при загрузке откликов: ${caughtError.message || 'Неизвестная ошибка'}`);
       }
+      setUserResponses([]); // Очищаем отклики при любой ошибке
     } finally {
-        // Устанавливаем isLoadingResponses в false только если это был не первый (основной) вызов, который рекурсивно вызвал фоллбэк
-        // Или если это был фоллбэк вызов.
-        if (!attemptFallback || (attemptFallback && !(firestoreError?.code === 'failed-precondition' && firestoreError?.message.includes('index')))) {
+        // Устанавливаем isLoadingResponses в false только если это был не первый (основной) вызов, 
+        // который рекурсивно вызвал фоллбэк, или если это был фоллбэк вызов.
+        const isStillAttemptingFallback = attemptFallback && (err as FirestoreError)?.code === 'failed-precondition' && (err as FirestoreError)?.message.includes('index');
+        if (!isStillAttemptingFallback) {
              setIsLoadingResponses(false);
         }
     }
@@ -247,7 +245,7 @@ export default function MyResponsesPage() {
           ))}
         </div>
       ) : (
-        !error && ( // Показываем "нет откликов" только если нет активной ошибки
+        !error && ( 
           <Card className="shadow-xl bg-card/70 backdrop-blur-sm p-6 sm:p-8 text-center">
             <ListFilter className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl sm:text-2xl font-semibold mb-2">У вас пока нет откликов</h3>
@@ -261,5 +259,6 @@ export default function MyResponsesPage() {
     </div>
   );
 }
+    
 
     
