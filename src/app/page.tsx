@@ -3,12 +3,12 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Briefcase, Users, Search, FileText, CheckCircle, ArrowRight, TrendingUp, UsersRound, MapPin, Star, Clock, Shield, LogIn } from 'lucide-react'; // Added LogIn
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'; // Убедимся, что CardFooter импортирован
+import { Briefcase, Users, Search, FileText, CheckCircle, ArrowRight, TrendingUp, UsersRound, MapPin, Star, Clock, Shield, LogIn } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation'; // Added useRouter
-import { auth, db } from "@/lib/firebase"; // Assuming db might be needed later, or can be removed if not
-import { GoogleAuthProvider, signInWithPopup, type UserCredential, getAdditionalUserInfo } from 'firebase/auth'; // Added getAdditionalUserInfo, UserCredential
+import { useRouter } from 'next/navigation';
+import { auth, db } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup, type UserCredential, getAdditionalUserInfo } from 'firebase/auth';
 import { useToast } from "@/hooks/use-toast";
 
 export default function HomePage() {
@@ -26,19 +26,18 @@ export default function HomePage() {
         prev.map(stat => ({
           ...stat,
           value: stat.value < stat.target 
-                 ? Math.min(stat.value + Math.ceil(stat.target / 30), stat.target) // Adjusted increment for smoother/faster animation
+                 ? Math.min(stat.value + Math.ceil(stat.target / 30), stat.target)
                  : stat.target
         }))
       );
-    }, 50); // Interval remains 50ms for smooth updates
+    }, 50); 
 
-    // Clear interval when targets are reached or component unmounts
     const allTargetsReached = animatedStats.every(stat => stat.value === stat.target);
     if (allTargetsReached) {
       clearInterval(interval);
     }
     return () => clearInterval(interval);
-  }, [animatedStats]); // Rerun effect if animatedStats changes (e.g. targets change, though not in this version)
+  }, [animatedStats]);
 
   const handleLogin = useCallback(async () => {
     if (!auth) {
@@ -187,9 +186,13 @@ export default function HomePage() {
           <div className="mx-auto grid items-start gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 lg:max-w-5xl">
             {features.map((feature, index) => (
               <Card key={index} className="text-center p-6 shadow-lg hover:shadow-accent/30 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm">
-                {feature.icon}
-                <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.description}</p>
+                <CardHeader className="p-0 mb-2">
+                  {feature.icon}
+                  <CardTitle className="text-xl font-bold">{feature.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <CardDescription className="text-sm text-muted-foreground">{feature.description}</CardDescription>
+                </CardContent>
               </Card>
             ))}
           </div>
@@ -209,7 +212,7 @@ export default function HomePage() {
               <Link
                 key={category.name}
                 href={`/tasks?category=${encodeURIComponent(category.name)}`}
-                className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover:scale-105 cursor-pointer group"
+                className="block p-4 rounded-lg border bg-card hover:bg-accent/10 hover:border-accent text-card-foreground shadow-sm hover:shadow-md hover:shadow-accent/30 transition-all duration-300 hover-scale-105 cursor-pointer group"
               >
                 <div className="flex items-center mb-2">
                   <div className="p-2 rounded-full bg-accent/10 text-accent mr-3">
@@ -365,5 +368,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    
