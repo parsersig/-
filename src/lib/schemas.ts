@@ -56,33 +56,33 @@ export type TaskFormValues = z.infer<typeof taskSchema>;
 
 export interface StoredTask extends TaskFormValues {
   id: string;
-  postedDate: any; // Для отображения, будет строкой или Date
-  firestorePostedDate?: Timestamp; // Для хранения оригинала из Firestore
+  postedDate: any; 
+  firestorePostedDate?: Timestamp; 
   city: string;
   views: number;
   userId?: string;
   status?: TaskStatus; 
   ownerDisplayName?: string;
-  executorId?: string; // ID исполнителя, который взялся за задание
-  startedAt?: any; // Дата начала выполнения (для отображения)
-  firestoreStartedAt?: Timestamp; // Оригинал Timestamp для startedAt
+  executorId?: string; 
+  startedAt?: any; 
+  firestoreStartedAt?: Timestamp; 
 }
 
 export const responseSchema = z.object({
   taskId: z.string(),
   taskTitle: z.string(),
   taskCategory: z.enum(taskCategories),
-  taskOwnerId: z.string(), // ID владельца задания
+  taskOwnerId: z.string(), 
   responderId: z.string(),
   responderName: z.string().nullable().optional(),
   responderPhotoURL: z.string().url().nullable().optional(),
-  message: z.string().optional(), // Опциональное сообщение от откликающегося
+  message: z.string().max(1000, "Сообщение не должно превышать 1000 символов.").optional(), 
   // respondedAt будет serverTimestamp
 });
 
 export type ResponseData = z.infer<typeof responseSchema> & {
   id: string;
-  respondedAt: any; // Для отображения
+  respondedAt: any; 
   firestoreRespondedAt?: Timestamp;
 };
 
@@ -90,14 +90,14 @@ export const notificationSchema = z.object({
   taskId: z.string(),
   taskTitle: z.string(),
   message: z.string(),
-  type: z.string().optional(), // например, "new_task", "new_response"
+  type: z.string().optional(), 
   read: z.boolean().default(false),
   // createdAt будет serverTimestamp
 });
 
 export type NotificationData = z.infer<typeof notificationSchema> & {
   id: string;
-  createdAt: any; // Для отображения
+  createdAt: any; 
   firestoreCreatedAt?: Timestamp;
 };
 
@@ -123,7 +123,6 @@ export const userProfileSchema = z.object({
 
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
-// Схема для формы редактирования, только те поля, что редактируются
 export const editUserProfileSchema = z.object({
   displayName: z.string().min(2, "Имя должно содержать минимум 2 символа").max(50, "Имя не должно превышать 50 символов").optional(),
   photoURL: z.string().url("Некорректный URL аватара").optional().or(z.literal("")),
@@ -135,7 +134,7 @@ export const editUserProfileSchema = z.object({
       const strVal = String(val).trim();
       if (strVal === "") return undefined;
       const num = parseInt(strVal, 10);
-      return isNaN(num) ? strVal : num; // Возвращаем строку если не число, чтобы zod выдал свою ошибку
+      return isNaN(num) ? strVal : num; 
     },
     z.number({ invalid_type_error: "Возраст должен быть числом" })
       .positive("Возраст должен быть положительным числом")
@@ -148,7 +147,6 @@ export const editUserProfileSchema = z.object({
 });
 export type EditUserProfileFormValues = z.infer<typeof editUserProfileSchema>;
 
-
 export const reviewSchema = z.object({
   taskId: z.string().optional(), 
   taskTitle: z.string().optional(), 
@@ -158,7 +156,7 @@ export const reviewSchema = z.object({
   reviewedUserId: z.string(), 
   rating: z.number().min(1).max(5).int(), 
   comment: z.string().min(10, "Комментарий должен содержать минимум 10 символов.").max(1000, "Комментарий не должен превышать 1000 символов."),
-  // createdAt будет serverTimestamp
+  createdAt: z.custom<Timestamp>((val) => val instanceof Timestamp).optional(), // Для serverTimestamp
 });
 
-export type ReviewData = z.infer<typeof reviewSchema
+export type ReviewData = z.infer<typeof reviewSchema>;
