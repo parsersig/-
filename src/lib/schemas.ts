@@ -3,26 +3,28 @@ import { z } from 'zod';
 import type { Timestamp } from 'firebase/firestore';
 
 export const taskCategories = [
-  "Ремонт и строительство", // Строительство, ремонт квартир, сантехника, электрика, отделка
-  "Уборка и помощь по хозяйству", // Уборка квартир, домов, мытье окон, помощь пожилым
-  "Курьерские услуги", // Доставка документов, еды, мелких посылок
-  "Компьютерная помощь", // Ремонт ПК, настройка ПО, удаление вирусов, установка Windows
-  "Репетиторство и обучение", // Математика, русский язык, английский, гитара, программирование
-  "Красота и здоровье", // Маникюр, педикюр, парикмахер, массаж, косметолог, фитнес-тренер
-  "Мероприятия и промоакции", // Ведущий, диджей, аниматор, фотограф на мероприятие, промоутер
-  "Фото и видеосъемка", // Фотосессии, видеосъемка, монтаж
-  "Дизайн и графика", // Логотипы, веб-дизайн, полиграфия, иллюстрации
-  "Разработка и IT", // Создание сайтов, веб-разработка, мобильная разработка, SEO
-  "Перевозки и грузчики", // Грузоперевозки, переезды, услуги грузчиков
-  "Юридическая помощь", // Консультации, составление документов, представительство
-  "Бухгалтерские услуги", // Ведение учета, сдача отчетности, консультации
-  "Уход за животными", // Выгул собак, передержка, стрижка животных
-  "Автосервис и ремонт авто", // Ремонт двигателя, ходовой, шиномонтаж, автоэлектрик
-  "Пошив и ремонт одежды", // Индивидуальный пошив, ремонт одежды, подгонка
-  "Сад и огород", // Ландшафтный дизайн, уход за садом, посадка растений
-  "Няни и уход за детьми", // Няня на час, сопровождение, развивающие занятия
-  "Другое" // Категория для уникальных или не вошедших в список услуг
+  "Ремонт и строительство", 
+  "Уборка и помощь по хозяйству",
+  "Курьерские услуги", 
+  "Компьютерная помощь", 
+  "Репетиторство и обучение", 
+  "Красота и здоровье", 
+  "Мероприятия и промоакции",
+  "Фото и видеосъемка", 
+  "Дизайн и графика", 
+  "Разработка и IT", 
+  "Перевозки и грузчики", 
+  "Юридическая помощь", 
+  "Бухгалтерские услуги", 
+  "Уход за животными", 
+  "Автосервис и ремонт авто", 
+  "Пошив и ремонт одежды", 
+  "Сад и огород", 
+  "Няни и уход за детьми", 
+  "Другое" 
 ] as const;
+
+export type TaskStatus = 'open' | 'in_progress' | 'completed' | 'cancelled';
 
 export const taskSchema = z.object({
   title: z.string()
@@ -59,13 +61,14 @@ export interface StoredTask extends TaskFormValues {
   city: string;
   views: number;
   userId?: string;
+  status?: TaskStatus; // Новое поле для статуса задания
 }
 
 export const responseSchema = z.object({
   taskId: z.string(),
   taskTitle: z.string(),
   taskCategory: z.enum(taskCategories),
-  taskOwnerId: z.string(),
+  taskOwnerId: z.string(), 
   responderId: z.string(),
   responderName: z.string().nullable().optional(),
   responderPhotoURL: z.string().url().nullable().optional(),
@@ -82,44 +85,59 @@ export const notificationSchema = z.object({
   taskId: z.string(),
   taskTitle: z.string(),
   message: z.string(),
-  type: z.string().optional(), // например 'new_task', 'new_response'
+  type: z.string().optional(), 
   read: z.boolean().default(false),
   // createdAt будет serverTimestamp
 });
 
 export type NotificationData = z.infer<typeof notificationSchema> & {
   id: string;
-  createdAt: string; // Уже отформатированная дата для отображения
+  createdAt: string; 
   firestoreCreatedAt?: Timestamp;
 };
 
 // Схема для профиля пользователя
 export const userProfileSchema = z.object({
-  aboutMe: z.string().max(1000, "Описание не должно превышать 1000 символов.").optional().default(""),
-  specializations: z.array(z.enum(taskCategories)).optional().default([]),
-  // Другие поля профиля можно добавить здесь позже (город, возраст, рейтинг и т.д.)
-  // displayName, photoURL, email будут браться из Firebase Auth и могут быть здесь для кэширования или если пользователь их изменит
-  displayName: z.string().optional(),
+  uid: z.string(),
+  displayName: z.string().optional().nullable(),
   photoURL: z.string().url().optional().nullable(),
   email: z.string().email().optional(),
+  aboutMe: z.string().max(1000, "Описание не должно превышать 1000 символов.").optional().default(""),
+  specializations: z.array(z.enum(taskCategories)).optional().default([]),
   city: z.string().optional().default("Ирбит"),
-  // поля, которые можно будет заполнять в будущем
-  age: z.number().positive().optional(),
+  age: z.number().positive().int().optional(),
   phoneVerified: z.boolean().default(false),
-  // ... и т.д.
+  registrationDate: z.any().optional(), // Firestore Timestamp или строка
+  lastSignInTime: z.any().optional(), // Firestore Timestamp или строка
+  // Для будущей агрегации
+  averageRating: z.number().min(0).max(5).optional(),
+  reviewsCount: z.number().int().min(0).optional(),
+  tasksCreated: z.number().int().min(0).optional(),
+  tasksCompleted: z.number().int().min(0).optional(),
 });
 
-export type UserProfile = z.infer<typeof userProfileSchema> & {
-  uid?: string; // Будет соответствовать auth.currentUser.uid
-  registrationDate?: string; // Для отображения, берется из auth.currentUser.metadata
-  lastSignInTime?: string; // Для отображения, берется из auth.currentUser.metadata
-};
+export type UserProfile = z.infer<typeof userProfileSchema>;
 
-// Тип для формы редактирования профиля (только редактируемые поля)
-export const editUserProfileSchema = userProfileSchema.pick({
-  aboutMe: true,
-  specializations: true,
-  // city: true, // Если захотим сделать город редактируемым
+export const editUserProfileSchema = z.object({
+  aboutMe: z.string().max(1000, "Описание не должно превышать 1000 символов.").optional().default(""),
+  specializations: z.array(z.enum(taskCategories)).optional().default([]),
 });
 export type EditUserProfileFormValues = z.infer<typeof editUserProfileSchema>;
 
+// Схема для отзыва
+export const reviewSchema = z.object({
+  taskId: z.string().optional(), // Отзыв может быть не привязан к конкретному заданию, а к пользователю в целом
+  reviewerId: z.string(), // ID того, кто оставил отзыв
+  reviewerName: z.string(), // Имя того, кто оставил отзыв
+  reviewerPhotoURL: z.string().url().optional().nullable(),
+  reviewedUserId: z.string(), // ID того, о ком отзыв
+  rating: z.number().min(1).max(5).int(), // Оценка от 1 до 5
+  comment: z.string().min(10, "Комментарий должен содержать минимум 10 символов.").max(1000, "Комментарий не должен превышать 1000 символов."),
+  // createdAt будет serverTimestamp
+});
+
+export type ReviewData = z.infer<typeof reviewSchema> & {
+  id: string;
+  createdAt: string; // Уже отформатированная дата для отображения
+  firestoreCreatedAt?: Timestamp;
+};

@@ -6,42 +6,131 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogClose } from "@/components/ui/dialog";
-import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, Clock, ListChecks, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, Clock, ListChecks, Loader2, MessageCircle } from "lucide-react";
 import { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
-import { doc, getDoc, DocumentSnapshot } from "firebase/firestore";
+import { doc, getDoc, DocumentSnapshot, collection, query, where, getDocs, orderBy, Timestamp } from "firebase/firestore";
 import Link from "next/link";
 import EditProfileForm from "@/components/profile/edit-profile-form";
-import type { UserProfile, EditUserProfileFormValues } from "@/lib/schemas";
+import type { UserProfile, EditUserProfileFormValues, ReviewData } from "@/lib/schemas"; // Добавлен импорт ReviewData
+
+const formatDate = (dateString: string | undefined): string => {
+  if (!dateString) return "Неизвестно";
+  return new Date(dateString).toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' });
+};
+
+const formatDateTime = (dateString: string | undefined): string => {
+  if (!dateString) return "Недавно";
+  return new Date(dateString).toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const formatReviewDate = (date: any): string => {
+  if (!date) return 'неизвестно';
+  if (date && typeof date.toDate === 'function') { // Firestore Timestamp
+    return date.toDate().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  if (typeof date === "string") { // Уже отформатированная строка
+    return date;
+  }
+  return 'неверный формат';
+};
+
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [userProfile, setUserProfile] = useState<Partial<UserProfile> | null>(null); // Partial, т.к. профиль может быть не полностью заполнен
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  // Заглушки для статистики и отзывов, пока не реализована их загрузка
+  // const [userReviews, setUserReviews] = useState<ReviewData[]>([]);
+  // const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+
+  const placeholderReviews: ReviewData[] = [
+    {
+      id: '1',
+      reviewerId: 'guest1',
+      reviewerName: 'Елена П.',
+      reviewerPhotoURL: 'https://placehold.co/40x40.png',
+      reviewedUserId: user?.uid || 'current_user',
+      rating: 5,
+      comment: 'Отличный исполнитель! Все сделал быстро и качественно. Рекомендую!',
+      createdAt: new Date(2024, 4, 15).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }),
+      taskTitle: 'Ремонт ванной комнаты' // Добавим для примера
+    },
+    {
+      id: '2',
+      reviewerId: 'guest2',
+      reviewerName: 'Алексей С.',
+      reviewerPhotoURL: 'https://placehold.co/40x40.png',
+      reviewedUserId: user?.uid || 'current_user',
+      rating: 4,
+      comment: 'Работа выполнена хорошо, но немного задержали по срокам. В целом доволен.',
+      createdAt: new Date(2024, 3, 20).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }),
+      taskTitle: 'Разработка логотипа' // Добавим для примера
+    }
+  ];
+
 
   const fetchUserProfile = useCallback(async (currentUser: User) => {
     if (!db || !currentUser?.uid) return;
     setIsLoadingProfile(true);
     try {
       const profileRef = doc(db, "userProfiles", currentUser.uid);
-      const profileSnap: DocumentSnapshot<Omit<UserProfile, 'uid' | 'registrationDate' | 'lastSignInTime'>> = await getDoc(profileRef) as DocumentSnapshot<Omit<UserProfile, 'uid' | 'registrationDate' | 'lastSignInTime'>>;
+      const profileSnap = await getDoc(profileRef) as DocumentSnapshot<UserProfile>;
       if (profileSnap.exists()) {
         setUserProfile(profileSnap.data());
       } else {
-        setUserProfile(null); // Профиль еще не создан
-        console.log("No such user profile!");
+        // Создаем базовый профиль, если его нет, с данными из Auth
+        const newProfileData: UserProfile = {
+            uid: currentUser.uid,
+            email: currentUser.email || undefined,
+            displayName: currentUser.displayName || "Новый пользователь",
+            photoURL: currentUser.photoURL || undefined,
+            registrationDate: currentUser.metadata.creationTime,
+            lastSignInTime: currentUser.metadata.lastSignInTime,
+            city: "Ирбит", // Значение по умолчанию
+            // aboutMe и specializations будут пустыми по умолчанию
+        };
+        await doc(db, "userProfiles", currentUser.uid).set(newProfileData);
+        setUserProfile(newProfileData);
+        console.log("New user profile created in Firestore.");
       }
     } catch (error) {
-      console.error("Error fetching user profile:", error);
+      console.error("Error fetching or creating user profile:", error);
       setUserProfile(null);
     } finally {
       setIsLoadingProfile(false);
     }
   }, []);
+
+  // TODO: Реализовать загрузку реальных отзывов и статистики
+  // const fetchUserReviews = useCallback(async (userId: string) => {
+  //   if (!db) return;
+  //   setIsLoadingReviews(true);
+  //   try {
+  //     const reviewsQuery = query(collection(db, "reviews"), where("reviewedUserId", "==", userId), orderBy("createdAt", "desc"));
+  //     const querySnapshot = await getDocs(reviewsQuery);
+  //     const fetchedReviews: ReviewData[] = [];
+  //     querySnapshot.forEach((doc) => {
+  //       const data = doc.data();
+  //       fetchedReviews.push({
+  //         id: doc.id,
+  //         ...data,
+  //         createdAt: formatReviewDate(data.createdAt),
+  //         firestoreCreatedAt: data.createdAt,
+  //       } as ReviewData);
+  //     });
+  //     setUserReviews(fetchedReviews);
+  //   } catch (error) {
+  //     console.error("Error fetching user reviews:", error);
+  //   } finally {
+  //     setIsLoadingReviews(false);
+  //   }
+  // }, []);
 
   useEffect(() => {
     if (!auth) {
@@ -54,19 +143,31 @@ export default function ProfilePage() {
       setIsLoadingAuth(false);
       if (currentUser) {
         await fetchUserProfile(currentUser);
+        // await fetchUserReviews(currentUser.uid); // Загрузка реальных отзывов (пока закомментировано)
       } else {
-        setUserProfile(null); // Сбрасываем профиль если пользователь вышел
+        setUserProfile(null);
+        // setUserReviews([]);
         setIsLoadingProfile(false);
+        // setIsLoadingReviews(false);
       }
     });
     return () => unsubscribe();
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile /*, fetchUserReviews*/]);
 
   const handleProfileUpdateSuccess = (updatedData: EditUserProfileFormValues) => {
-    // Оптимистичное обновление или повторная загрузка
-    setUserProfile(prev => ({ ...prev, ...updatedData, uid: user?.uid, email: user?.email || undefined, displayName: user?.displayName || undefined, photoURL: user?.photoURL || undefined }));
+    setUserProfile(prev => ({ 
+        ...(prev as UserProfile), // Приводим тип, так как prev может быть null
+        ...updatedData, 
+        // Важно: uid, email, displayName, photoURL, registrationDate, lastSignInTime не должны перезаписываться из формы редактирования
+        // Они либо берутся из Auth, либо устанавливаются при создании профиля
+        uid: user!.uid, // user здесь не должен быть null
+        email: user!.email || undefined,
+        displayName: userProfile?.displayName || user!.displayName || "Пользователь", // Предпочитаем из userProfile, если есть
+        photoURL: userProfile?.photoURL || user!.photoURL || undefined,
+        registrationDate: userProfile?.registrationDate || user!.metadata.creationTime,
+        lastSignInTime: userProfile?.lastSignInTime || user!.metadata.lastSignInTime,
+    }));
     setIsEditDialogOpen(false);
-    // Для полной синхронизации можно вызвать fetchUserProfile(user!) снова, но это лишний запрос если данные уже есть
   };
 
   if (isLoadingAuth || (user && isLoadingProfile)) {
@@ -100,120 +201,37 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  const registrationDate = user.metadata.creationTime 
-    ? new Date(user.metadata.creationTime).toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' }) 
-    : "Неизвестно";
   
-  const lastSignInDate = user.metadata.lastSignInTime
-    ? new Date(user.metadata.lastSignInTime).toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : "Недавно";
+  // Форматируем даты из user.metadata для отображения
+  const registrationDateDisplay = formatDate(user.metadata.creationTime);
+  const lastSignInDateDisplay = formatDateTime(user.metadata.lastSignInTime);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8 pb-10">
+      {/* --- Hero Section --- */}
       <Card className="shadow-xl bg-card/80 backdrop-blur-sm overflow-hidden">
-        <CardHeader className="items-center text-center border-b pb-6 bg-muted/20 p-6 sm:p-8">
-          <div className="relative mb-4">
-            <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-4 border-accent shadow-lg">
+        <CardHeader className="relative p-0">
+          {/* Placeholder for a banner image if desired in the future */}
+          <div className="h-32 sm:h-40 bg-gradient-to-r from-accent/30 via-primary/20 to-accent/30"></div>
+          <div className="absolute top-16 sm:top-20 left-1/2 -translate-x-1/2 flex flex-col items-center w-full px-4">
+            <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-4 border-background bg-background shadow-lg">
               <AvatarImage src={userProfile?.photoURL || user.photoURL || undefined} alt={userProfile?.displayName || user.displayName || "User"} data-ai-hint="user avatar large" />
-              <AvatarFallback className="text-4xl sm:text-5xl bg-muted/50">
-                {(userProfile?.displayName || user.displayName) ? (userProfile?.displayName || user.displayName)!.charAt(0).toUpperCase() : <UserCircle className="h-16 w-16"/>}
+              <AvatarFallback className="text-4xl sm:text-5xl bg-muted">
+                {(userProfile?.displayName || user.displayName) ? (userProfile.displayName || user.displayName)!.charAt(0).toUpperCase() : <UserCircle className="h-16 w-16"/>}
               </AvatarFallback>
             </Avatar>
-            {/* Кнопка редактирования фото пока не активна, но оставим для UI */}
-            <Button variant="outline" size="icon" className="absolute bottom-1 right-1 h-8 w-8 rounded-full bg-background hover:bg-accent/10 border-accent/50 text-accent hover:text-accent shadow-md" title="Редактировать фото (в разработке)">
-              <Edit className="h-4 w-4" />
-              <span className="sr-only">Редактировать фото</span>
-            </Button>
-          </div>
-          <CardTitle className="text-2xl sm:text-3xl font-bold">{userProfile?.displayName || user.displayName || "Пользователь"}</CardTitle>
-          <CardDescription className="text-md text-muted-foreground pt-1">{userProfile?.city || "Ирбит (заглушка)"} • {userProfile?.age ? `${userProfile.age} лет` : "Возраст не указан (заглушка)"}</CardDescription> 
-          <div className="flex flex-wrap gap-2 mt-4 justify-center">
-            <Badge variant="secondary" className="text-sm py-1 px-3 bg-green-600/20 text-green-400 border-green-500/40">Исполнитель (статус-заглушка)</Badge>
-            <Badge variant="secondary" className="text-sm py-1 px-3 bg-blue-600/20 text-blue-400 border-blue-500/40">Проверен (заглушка)</Badge>
+            <CardTitle className="text-2xl sm:text-3xl font-bold mt-3">{userProfile?.displayName || user.displayName || "Пользователь"}</CardTitle>
+            <CardDescription className="text-sm sm:text-md text-muted-foreground pt-0.5">
+              {userProfile?.city || "Ирбит"} {userProfile?.age && `• ${userProfile.age} лет`}
+            </CardDescription>
+            <div className="flex flex-wrap gap-2 mt-2 justify-center">
+              <Badge variant="outline" className="border-green-500/70 text-green-400">Исполнитель (статус)</Badge>
+              <Badge variant="outline" className="border-blue-500/70 text-blue-400">Проверен</Badge>
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="p-6 sm:p-8 space-y-6">
-          
-          <section>
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><UserCircle className="h-6 w-6 mr-2.5 text-accent"/>Основная информация</h3>
-            <div className="space-y-2 text-sm text-muted-foreground pl-8">
-              <p className="flex items-center">
-                <Mail className="h-4 w-4 mr-2.5 text-accent/80" />
-                Email: <span className="ml-1 font-medium text-foreground/90">{user.email || "Не указан"}</span> 
-                {user.emailVerified && (
-                  <span title="Email подтвержден">
-                    <ShieldCheck className="h-4 w-4 ml-2 text-green-400" />
-                  </span>
-                )}
-              </p>
-              <p className="flex items-center"><CalendarDays className="h-4 w-4 mr-2.5 text-accent/80" />Дата регистрации: <span className="ml-1 font-medium text-foreground/90">{registrationDate}</span></p>
-              <p className="flex items-center"><Clock className="h-4 w-4 mr-2.5 text-accent/80" />Был(а) на сайте: <span className="ml-1 font-medium text-foreground/90">{lastSignInDate}</span></p>
-              {/* <p className="text-xs mt-1">Подтверждения: Email, Телефон, Соцсеть (заглушка)</p> */}
-            </div>
-          </section>
-
-           <section>
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><TrendingUp className="h-6 w-6 mr-2.5 text-accent"/>Статистика (заглушка)</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center pl-8">
-                <Card className="p-4 bg-muted/40 rounded-lg shadow">
-                    <p className="text-3xl font-bold text-accent">34</p>
-                    <p className="text-xs text-muted-foreground mt-1">заданий создано</p>
-                </Card>
-                <Card className="p-4 bg-muted/40 rounded-lg shadow">
-                    <p className="text-3xl font-bold text-accent">0</p>
-                    <p className="text-xs text-muted-foreground mt-1">заданий выполнено</p>
-                </Card>
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><Briefcase className="h-6 w-6 mr-2.5 text-accent"/>О себе</h3>
-            {isLoadingProfile && <p className="text-sm text-muted-foreground pl-8">Загрузка информации...</p>}
-            {!isLoadingProfile && userProfile?.aboutMe && <p className="text-sm text-muted-foreground pl-8 whitespace-pre-line">{userProfile.aboutMe}</p>}
-            {!isLoadingProfile && !userProfile?.aboutMe && <p className="text-sm text-muted-foreground pl-8 italic">Информация о себе еще не добавлена.</p>}
-          </section>
-
-           <section>
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><ListChecks className="h-6 w-6 mr-2.5 text-accent"/>Специализации</h3>
-            {isLoadingProfile && <p className="text-sm text-muted-foreground pl-8">Загрузка специализаций...</p>}
-            {!isLoadingProfile && userProfile?.specializations && userProfile.specializations.length > 0 && (
-              <div className="flex flex-wrap gap-2 pl-8">
-                {userProfile.specializations.map(spec => <Badge key={spec} variant="secondary">{spec}</Badge>)}
-              </div>
-            )}
-            {!isLoadingProfile && (!userProfile?.specializations || userProfile.specializations.length === 0) && (
-              <p className="text-sm text-muted-foreground pl-8 italic">Специализации еще не выбраны.</p>
-            )}
-          </section>
-          
-          <section>
-            <h3 className="text-xl font-semibold mb-3 text-foreground flex items-center"><Star className="h-6 w-6 mr-2.5 text-accent"/>Рейтинг и Отзывы (заглушка)</h3>
-            <div className="pl-8 space-y-4">
-              <div className="flex items-baseline space-x-2">
-                <div className="flex text-yellow-400">
-                    {[...Array(5)].map((_, i) => <Star key={i} className="h-6 w-6 fill-current" />)}
-                </div>
-                <span className="text-muted-foreground text-lg font-semibold">5.0</span>
-                <span className="text-sm text-muted-foreground">(8 отзывов)</span>
-              </div>
-              <div className="space-x-2">
-                <Button variant="outline" size="sm" className="text-xs">Положительные (8)</Button>
-                <Button variant="outline" size="sm" className="text-xs">Отрицательные (0)</Button>
-              </div>
-              <Card className="p-4 bg-muted/40 rounded-lg shadow">
-                <div className="flex justify-between items-start mb-1">
-                    <p className="text-sm font-semibold text-foreground/90">Задание «Сделать по образцу 4 макета для контекстной рекламы» <span className="text-green-400 font-normal">выполнено</span></p>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">2 апреля 2025</span>
-                </div>
-                <p className="text-xs text-muted-foreground mb-2">Исполнитель: Екатерина С.</p>
-                <p className="text-sm italic">"Заказчик была на связи во время выполнения задания, оперативно приняла результат. Буду рада помочь еще!)"</p>
-              </Card>
-            </div>
-          </section>
-
-        </CardContent>
-        <CardFooter className="border-t p-6 sm:p-8">
+        {/* Empty CardContent to push footer down, adjust pt as needed */}
+        <CardContent className="pt-28 sm:pt-32 p-6"> 
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="w-full hover-scale text-base py-3">
@@ -227,11 +245,11 @@ export default function ProfilePage() {
                       Обновите информацию о себе и своих специализациях.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="overflow-y-auto pr-2"> {/* Добавляем прокрутку для контента формы */}
+                  <div className="overflow-y-auto pr-2 flex-grow">
                     {user && (
                         <EditProfileForm 
                             currentUser={user} 
-                            initialProfileData={userProfile || {}} // Передаем пустой объект, если профиля нет
+                            initialProfileData={userProfile || { uid: user.uid } }
                             onProfileUpdated={handleProfileUpdateSuccess}
                             onCancel={() => setIsEditDialogOpen(false)}
                         />
@@ -239,9 +257,120 @@ export default function ProfilePage() {
                   </div>
               </DialogContent>
             </Dialog>
-        </CardFooter>
+        </CardContent>
+      </Card>
+
+      {/* --- About Me & Specializations --- */}
+      <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
+        <Card className="md:col-span-2 shadow-lg bg-card/70 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center"><Briefcase className="h-6 w-6 mr-2.5 text-accent"/>Обо мне</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProfile && <p className="text-sm text-muted-foreground italic">Загрузка информации...</p>}
+            {!isLoadingProfile && userProfile?.aboutMe && <p className="text-sm text-muted-foreground whitespace-pre-line">{userProfile.aboutMe}</p>}
+            {!isLoadingProfile && !userProfile?.aboutMe && <p className="text-sm text-muted-foreground italic">Информация о себе еще не добавлена. Вы можете добавить ее, нажав "Редактировать профиль".</p>}
+          </CardContent>
+        </Card>
+        <Card className="md:col-span-1 shadow-lg bg-card/70 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center"><ListChecks className="h-6 w-6 mr-2.5 text-accent"/>Специализации</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProfile && <p className="text-sm text-muted-foreground italic">Загрузка...</p>}
+            {!isLoadingProfile && userProfile?.specializations && userProfile.specializations.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {userProfile.specializations.map(spec => <Badge key={spec} variant="secondary" className="bg-accent/10 text-accent border-accent/30">{spec}</Badge>)}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Специализации еще не выбраны. Вы можете добавить их, нажав "Редактировать профиль".</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* --- Activity & Stats --- */}
+      <Card className="shadow-lg bg-card/70 backdrop-blur-sm">
+        <CardHeader>
+            <CardTitle className="text-xl flex items-center"><TrendingUp className="h-6 w-6 mr-2.5 text-accent"/>Активность и Статистика</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div className="p-4 bg-muted/30 rounded-lg">
+                <p className="flex items-center font-medium text-foreground/90"><CalendarDays className="h-5 w-5 mr-2 text-accent/80" />Дата регистрации:</p>
+                <p className="ml-7 text-muted-foreground">{registrationDateDisplay}</p>
+            </div>
+             <div className="p-4 bg-muted/30 rounded-lg">
+                <p className="flex items-center font-medium text-foreground/90"><Clock className="h-5 w-5 mr-2 text-accent/80" />Последний визит:</p>
+                <p className="ml-7 text-muted-foreground">{lastSignInDateDisplay}</p>
+            </div>
+            <div className="p-4 bg-muted/30 rounded-lg">
+                <p className="flex items-center font-medium text-foreground/90"><ShieldCheck className="h-5 w-5 mr-2 text-green-400" />Email:</p>
+                 <p className="ml-7 text-muted-foreground">{user.email} {user.emailVerified ? "(подтвержден)" : "(не подтвержден)"}</p>
+            </div>
+            <div className="p-4 bg-muted/30 rounded-lg text-center">
+                <p className="text-3xl font-bold text-accent">{userProfile?.tasksCreated || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">Заданий создано</p>
+            </div>
+            <div className="p-4 bg-muted/30 rounded-lg text-center">
+                <p className="text-3xl font-bold text-accent">{userProfile?.tasksCompleted || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">Заданий выполнено</p>
+            </div>
+             <div className="p-4 bg-muted/30 rounded-lg text-center">
+                <p className="text-3xl font-bold text-accent">{userProfile?.reviewsCount || 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">Отзывов получено</p>
+            </div>
+        </CardContent>
+      </Card>
+
+      {/* --- Reviews Section --- */}
+      <Card className="shadow-lg bg-card/70 backdrop-blur-sm">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-xl flex items-center"><Star className="h-6 w-6 mr-2.5 text-accent"/>Рейтинг и Отзывы</CardTitle>
+            <div className="flex items-baseline space-x-1 text-sm">
+                <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                <span className="font-semibold text-lg text-foreground">{userProfile?.averageRating?.toFixed(1) || "Н/Д"}</span>
+                <span className="text-muted-foreground">({userProfile?.reviewsCount || 0} отзывов)</span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* TODO: Load and display actual reviews. For now, using placeholders. */}
+          {/* {isLoadingReviews && <div className="text-center py-4"><Loader2 className="mx-auto h-8 w-8 text-accent animate-spin"/></div>} */}
+          {placeholderReviews.length > 0 ? (
+            <div className="space-y-4">
+              {placeholderReviews.map((review) => (
+                <Card key={review.id} className="p-4 bg-muted/30 shadow-sm">
+                  <div className="flex items-start space-x-3">
+                    <Avatar className="h-10 w-10 border">
+                      <AvatarImage src={review.reviewerPhotoURL || undefined} alt={review.reviewerName} data-ai-hint="reviewer avatar" />
+                      <AvatarFallback>{review.reviewerName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-foreground/90">{review.reviewerName}</p>
+                        <div className="flex text-yellow-400">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className={`h-4 w-4 ${i < review.rating ? 'fill-yellow-400' : 'fill-muted'}`} />
+                          ))}
+                        </div>
+                      </div>
+                      {review.taskTitle && <p className="text-xs text-muted-foreground">По заданию: «{review.taskTitle}»</p>}
+                       <p className="text-xs text-muted-foreground mb-1.5">{review.createdAt}</p>
+                      <p className="text-sm text-muted-foreground italic">"{review.comment}"</p>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              <div className="text-center pt-2">
+                <Button variant="link" className="text-accent text-sm">Показать все отзывы (в разработке)</Button>
+              </div>
+            </div>
+          ) : (
+             <p className="text-sm text-muted-foreground italic text-center py-4">Отзывов пока нет.</p>
+          )}
+        </CardContent>
       </Card>
     </div>
   );
 }
-
