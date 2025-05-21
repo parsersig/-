@@ -1,3 +1,4 @@
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -7,18 +8,17 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Briefcase, CalendarDays, Coins, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle, Users, Check, X, ThumbsUp, ThumbsDown, User } from "lucide-react"; // Добавлены Coins, ThumbsUp, ThumbsDown, User
+import { ArrowLeft, Briefcase, CalendarDays, Coins, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle, Users, Check, X, ThumbsUp, ThumbsDown, User, PlayCircle } from "lucide-react";
 import type { StoredTask, ResponseData, UserProfile } from "@/lib/schemas";
 import { useToast } from "@/hooks/use-toast";
 import { db, auth } from "@/lib/firebase";
-import { 
-  doc, getDoc, updateDoc, increment, Timestamp, 
-  collection, addDoc, serverTimestamp, query, where, 
-  orderBy, onSnapshot, getDocs, // <--- getDocs добавлен сюда
-  type QuerySnapshot, type QueryDocumentSnapshot, type FirestoreError, type Firestore 
+import {
+  doc, getDoc, updateDoc, increment, Timestamp,
+  collection, addDoc, serverTimestamp, query, where,
+  orderBy, onSnapshot, getDocs,
+  type QuerySnapshot, type QueryDocumentSnapshot, type FirestoreError, type Firestore
 } from "firebase/firestore";
 import type { User as FirebaseUser } from "firebase/auth";
-
 
 const formatDate = (date: any): string => {
   if (!date) return "Дата не указана";
@@ -48,6 +48,21 @@ const formatResponseDate = (date: any): string => {
   return d.toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
+const formatStartedDate = (date: any): string => {
+  if (!date) return "не указана";
+  let d: Date;
+  if (date instanceof Timestamp) {
+    d = date.toDate();
+  } else if (typeof date === 'string' || typeof date === 'number') {
+    d = new Date(date);
+  } else {
+    return 'неверный формат';
+  }
+  if (isNaN(d.getTime())) return 'Неверный формат даты';
+  return d.toLocaleString("ru-RU", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+
 export default function TaskDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -60,8 +75,10 @@ export default function TaskDetailPage() {
   const [isLoadingOwner, setIsLoadingOwner] = useState(false);
   
   const [isResponding, setIsResponding] = useState(false);
+  const [isProcessingAction, setIsProcessingAction] = useState(false); // Для кнопки "Приступить"
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [hasResponded, setHasResponded] = useState(false);
+  const [isExecutor, setIsExecutor] = useState(false); // Текущий пользователь - исполнитель этого задания?
   
   const [taskResponses, setTaskResponses] = useState<ResponseData[]>([]);
   const [isLoadingResponses, setIsLoadingResponses] = useState(false);
@@ -90,12 +107,11 @@ export default function TaskDetailPage() {
         });
         sessionStorage.setItem(viewedTasksKey, "true");
         setTask((prev) => (prev ? { ...prev, views: (prev.views || 0) + 1 } : null));
-        console.log("View count incremented for task:", currentTaskId);
       } catch (error) {
         console.error("Error incrementing view count:", error);
       }
     }
-  }, [db]);
+  }, []); // db убрано из зависимостей, т.к. он импортируется и не меняется
 
   useEffect(() => {
     if (taskId && db) {
@@ -106,27 +122,34 @@ export default function TaskDetailPage() {
           const taskRef = doc(firestore, "tasks", taskId);
           const taskSnap = await getDoc(taskRef);
           if (taskSnap.exists()) {
-            const taskData = taskSnap.data() as StoredTask; // Omit<StoredTask, 'id' | 'postedDate'> & { postedDate: Timestamp };
+            const taskData = taskSnap.data() as StoredTask;
             const fetchedTask = {
               ...taskData,
               id: taskSnap.id,
-              postedDate: formatDate(taskData.postedDate), // Используем уже существующее поле, если оно Timestamp
-              firestorePostedDate: taskData.postedDate as Timestamp // Сохраняем оригинал
+              postedDate: formatDate(taskData.postedDate),
+              firestorePostedDate: taskData.postedDate as Timestamp,
+              startedAt: taskData.startedAt ? formatStartedDate(taskData.startedAt) : undefined,
+              firestoreStartedAt: taskData.startedAt as Timestamp | undefined,
             } as StoredTask;
             setTask(fetchedTask);
 
             if (fetchedTask.userId) {
               setIsLoadingOwner(true);
-              const ownerRef = doc(firestore, "userProfiles", fetchedTask.userId);
-              const ownerSnap = await getDoc(ownerRef);
-              if (ownerSnap.exists()) {
-                setTaskOwner(ownerSnap.data() as UserProfile);
-              } else {
+              try {
+                const ownerRef = doc(firestore, "userProfiles", fetchedTask.userId);
+                const ownerSnap = await getDoc(ownerRef);
+                if (ownerSnap.exists()) {
+                  setTaskOwner(ownerSnap.data() as UserProfile);
+                } else {
+                  setTaskOwner(null);
+                }
+              } catch (ownerError) {
+                console.error("Error fetching task owner profile:", ownerError);
                 setTaskOwner(null);
+              } finally {
+                setIsLoadingOwner(false);
               }
-              setIsLoadingOwner(false);
             }
-
             await incrementViewCount(taskId);
           } else {
             setTask(null);
@@ -149,15 +172,13 @@ export default function TaskDetailPage() {
       setIsLoading(false);
       setTask(null);
     }
-  }, [taskId, db, incrementViewCount, toast]);
+  }, [taskId, incrementViewCount, toast]);
 
+  // Загрузка откликов, если текущий пользователь - автор задания
  useEffect(() => {
-    if (!currentUser || !task || task.userId !== currentUser.uid || !db) {
-      if (task && currentUser && task.userId !== currentUser.uid) { 
-        setIsLoadingResponses(false);
-        setTaskResponses([]);
-      }
-      if(!db && currentUser && task) console.error("DB not available for fetching responses");
+    if (!db || !task || !currentUser || task.userId !== currentUser.uid) {
+      setTaskResponses([]); // Очищаем отклики если условия не выполнены
+      setIsLoadingResponses(false);
       return;
     }
     
@@ -186,39 +207,53 @@ export default function TaskDetailPage() {
         setIsLoadingResponses(false);
       }, 
       (error: FirestoreError) => {
-        console.error("Error fetching task responses:", error.message, error.code, error.name, error.stack);
-        if (error.message.includes("index")) {
+        console.error("Error fetching task responses:", error);
+        if (error.message && error.message.includes("index")) {
            toast({
             title: "Ошибка базы данных",
-            description: `Для отображения откликов требуется конфигурация индекса в Firestore. Ссылка для создания индекса: ${error.message.substring(error.message.indexOf('https://'))}`,
+            description: `Для отображения откликов требуется конфигурация индекса в Firestore. Пожалуйста, создайте его, перейдя по ссылке (которую можно найти в консоли разработчика, если она не была показана ранее) или обратитесь к администратору. Ошибка: ${error.message}`,
             variant: "destructive",
-            duration: 10000,
+            duration: 15000,
           });
         } else {
           toast({ title: "Ошибка", description: `Не удалось загрузить отклики на задание: ${error.message}`, variant: "destructive" });
         }
+        setTaskResponses([]);
         setIsLoadingResponses(false);
       }
     );
     return () => unsubscribeResponses();
-  }, [task, currentUser, db, toast]);
+  }, [task, currentUser, toast]); // db убрано из зависимостей
 
+   // Проверка, откликался ли уже пользователь и является ли он исполнителем
    useEffect(() => {
-    if (task && currentUser && db && task.userId !== currentUser.uid) {
-      const firestore = db as Firestore;
-      const responsesRef = collection(firestore, "responses");
-      const q = query(responsesRef, where("taskId", "==", task.id), where("responderId", "==", currentUser.uid));
-      getDocs(q).then(querySnapshot => {
-        setHasResponded(!querySnapshot.empty);
-      }).catch(err => {
-        console.error("Error checking response status", err);
-        toast({title: "Ошибка проверки отклика", description: err.message, variant: "destructive"});
-      });
-    } else {
-      setHasResponded(false); 
+    if (!db || !task || !currentUser || task.userId === currentUser.uid) {
+      setHasResponded(false);
+      setIsExecutor(false);
+      return;
     }
-  }, [task, currentUser, db, toast]);
 
+    // Проверка, является ли текущий пользователь исполнитеlem этого задания
+    if (task.executorId === currentUser.uid) {
+      setIsExecutor(true);
+      setHasResponded(true); // Если он исполнитель, значит он как минимум откликнулся (или был назначен)
+      return; // Дальнейшая проверка hasResponded не нужна
+    } else {
+      setIsExecutor(false); // Сбрасываем, если он не исполнитель этого задания
+    }
+    
+    // Проверка, откликался ли пользователь, если он НЕ исполнитель
+    const firestore = db as Firestore;
+    const responsesRef = collection(firestore, "responses");
+    const q = query(responsesRef, where("taskId", "==", task.id), where("responderId", "==", currentUser.uid));
+    
+    getDocs(q).then(querySnapshot => {
+      setHasResponded(!querySnapshot.empty);
+    }).catch(err => {
+      console.error("Error checking response status", err);
+      toast({title: "Ошибка проверки отклика", description: err.message, variant: "destructive"});
+    });
+  }, [task, currentUser, toast]); // db убрано
 
   const handleRespond = async () => {
     if (!db || !task) {
@@ -233,10 +268,15 @@ export default function TaskDetailPage() {
       toast({ title: "Это ваше задание", description: "Вы не можете откликнуться на собственное задание.", variant: "default" });
       return;
     }
-    if (hasResponded) {
+    if (hasResponded && !isExecutor) { // Если уже откликнулся, но еще не исполнитель
       toast({ title: "Вы уже откликались", description: "Вы уже отправляли отклик на это задание.", variant: "default" });
       return;
     }
+     if (task.status !== 'open') {
+      toast({ title: "Задание неактивно", description: "Это задание уже не принимает отклики.", variant: "default" });
+      return;
+    }
+
     setIsResponding(true);
     try {
       const firestore = db as Firestore;
@@ -249,6 +289,7 @@ export default function TaskDetailPage() {
         responderName: currentUser.displayName || "Анонимный исполнитель",
         responderPhotoURL: currentUser.photoURL || null,
         respondedAt: serverTimestamp(),
+        message: "", // Можно добавить поле для сопроводительного сообщения
       };
       await addDoc(collection(firestore, "responses"), responseData);
       toast({ 
@@ -256,7 +297,7 @@ export default function TaskDetailPage() {
         description: `Ваш отклик на задание «${task.title}» успешно отправлен и сохранен в базе данных!`, 
         duration: 7000 
       });
-      setHasResponded(true);
+      setHasResponded(true); // Обновляем состояние, что пользователь откликнулся
     } catch (error: any) {
       console.error("Failed to save response to Firestore", error);
       toast({ title: "Ошибка сохранения отклика", description: `Не удалось сохранить ваш отклик. ${error.message || "Пожалуйста, попробуйте еще раз."}`, variant: "destructive" });
@@ -265,12 +306,45 @@ export default function TaskDetailPage() {
     }
   };
 
-  const handleResponseAction = (responseId: string, action: "accepted" | "rejected") => {
-    toast({
-      title: `Отклик ${action === "accepted" ? "принят" : "отклонен"} (демо)`,
-      description: `Отклик (ID: ${responseId}) был помечен как ${action === "accepted" ? "принятый" : "отклоненный"}. (Реальная логика будет добавлена позже)`,
-    });
+  const handleStartTask = async () => {
+    if (!db || !task || !currentUser) {
+      toast({ title: "Ошибка", description: "Необходимые данные отсутствуют.", variant: "destructive" });
+      return;
+    }
+    if (task.status !== 'open' || task.userId === currentUser.uid || !hasResponded) {
+      toast({ title: "Действие недоступно", description: "Невозможно приступить к выполнению этого задания.", variant: "default" });
+      return;
+    }
+
+    setIsProcessingAction(true);
+    try {
+      const firestore = db as Firestore;
+      const taskRef = doc(firestore, "tasks", task.id);
+      await updateDoc(taskRef, {
+        status: 'in_progress',
+        executorId: currentUser.uid,
+        startedAt: serverTimestamp(),
+      });
+      
+      setTask(prev => prev ? ({ 
+        ...prev, 
+        status: 'in_progress', 
+        executorId: currentUser.uid, 
+        // startedAt будет обновлен при следующей загрузке или можно обновить локально с new Date()
+        // Для UI немедленного отображения, лучше обновить локально с new Date(), а firestoreStartedAt придет потом
+        startedAt: formatStartedDate(new Date()) 
+      }) : null);
+      setIsExecutor(true); // Теперь текущий пользователь - исполнитель
+
+      toast({ title: "Работа начата!", description: `Вы приступили к выполнению задания «${task.title}».`, duration: 5000 });
+    } catch (error: any) {
+      console.error("Error starting task:", error);
+      toast({ title: "Ошибка", description: `Не удалось начать выполнение задания: ${error.message}`, variant: "destructive" });
+    } finally {
+      setIsProcessingAction(false);
+    }
   };
+
 
   if (isLoading) {
     return (
@@ -294,7 +368,7 @@ export default function TaskDetailPage() {
       </div>
     );
   }
-  if (!task) return null;
+  if (!task) return null; // Дополнительная защита, если task все еще undefined
   
   const isOwner = currentUser?.uid === task.userId;
 
@@ -314,44 +388,67 @@ export default function TaskDetailPage() {
             </div>
             <div className="mt-2 md:mt-0 md:text-right shrink-0">
               <div className="flex items-center text-lg sm:text-xl font-semibold text-accent">
-                <Coins className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5" /> {/* Изменено */}
+                <Coins className="h-5 w-5 sm:h-6 sm:w-6 mr-1.5" />
                 {task.budget ? `до ${task.budget.toLocaleString()} ₽` : task.isNegotiable ? "Цена договорная" : "Бюджет не указан"}
               </div>
               {task.isNegotiable && task.budget && <p className="text-xs text-muted-foreground">(также возможен торг)</p>}
             </div>
           </div>
+           {task.status === 'in_progress' && (
+            <Badge variant="secondary" className="mt-3 bg-yellow-500/20 text-yellow-300 border-yellow-500/40">В процессе выполнения</Badge>
+          )}
+          {task.status === 'completed' && (
+            <Badge variant="secondary" className="mt-3 bg-green-500/20 text-green-400 border-green-500/40">Выполнено</Badge>
+          )}
+           {task.status === 'cancelled' && (
+            <Badge variant="destructive" className="mt-3">Отменено</Badge>
+          )}
         </CardHeader>
         
         <CardContent className="py-5 sm:py-6 border-t px-4 sm:px-6">
-          <div className="mb-6">
-            <h3 className="text-lg sm:text-xl font-semibold mb-2 text-foreground/90">Детали заказчика:</h3>
-            <div className="flex items-center space-x-3 text-sm text-muted-foreground">
-              {isLoadingOwner ? (
-                <Loader2 className="h-5 w-5 animate-spin text-accent" />
-              ) : taskOwner ? (
-                <>
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={taskOwner.photoURL || undefined} alt={taskOwner.displayName || "Заказчик"} />
-                    <AvatarFallback>{taskOwner.displayName ? taskOwner.displayName.charAt(0).toUpperCase() : <UserCircle />}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium text-foreground">{taskOwner.displayName || "Заказчик"}</p>
-                    <div className="flex items-center space-x-1 text-xs mt-0.5" title="Отзывы о заказчике (демо)">
-                      <ThumbsUp className="h-3.5 w-3.5 text-green-500"/> <span>15</span>
-                      <ThumbsDown className="h-3.5 w-3.5 text-red-500"/> <span>2</span>
+          {task.userId && (
+            <div className="mb-6">
+              <h3 className="text-lg sm:text-xl font-semibold mb-2 text-foreground/90">Детали заказчика:</h3>
+              <div className="flex items-center space-x-3 text-sm text-muted-foreground">
+                {isLoadingOwner ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-accent" />
+                ) : taskOwner ? (
+                  <>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={taskOwner.photoURL || undefined} alt={taskOwner.displayName || "Заказчик"} />
+                      <AvatarFallback>{taskOwner.displayName ? taskOwner.displayName.charAt(0).toUpperCase() : <User />}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-foreground">{taskOwner.displayName || "Заказчик"}</p>
+                      <div className="flex items-center space-x-2 text-xs mt-0.5" title="Отзывы о заказчике (демо)">
+                        <ThumbsUp className="h-3.5 w-3.5 text-green-500"/> <span className="text-green-400">15</span>
+                        <ThumbsDown className="h-3.5 w-3.5 text-red-500"/> <span className="text-red-400">2</span>
+                      </div>
                     </div>
-                  </div>
-                </>
-              ) : (
-                <p>Информация о заказчике не найдена.</p>
-              )}
+                  </>
+                ) : (
+                  <p>Информация о заказчике не найдена.</p>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mb-6 border-t pt-5">
             <h3 className="text-lg sm:text-xl font-semibold mb-2 text-foreground/90">Описание задания:</h3>
             <p className="text-base text-muted-foreground whitespace-pre-line leading-relaxed">{task.description}</p>
           </div>
+          
+          {task.status === 'in_progress' && task.executorId && (
+            <div className="mb-6 border-t pt-5">
+              <h3 className="text-lg sm:text-xl font-semibold mb-2 text-foreground/90">Исполнение:</h3>
+              {isExecutor ? (
+                <p className="text-green-400">Вы выполняете это задание. Начато: {task.startedAt || 'Недавно'}.</p>
+              ) : (
+                <p className="text-yellow-400">Задание выполняется другим исполнителем. Начато: {task.startedAt || 'Недавно'}.</p>
+              )}
+            </div>
+          )}
+
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 sm:gap-x-8 gap-y-3 sm:gap-y-4 text-sm border-t pt-5">
             <div className="flex items-center"><MapPin className="h-5 w-5 mr-2 sm:mr-3 text-accent/80 shrink-0" /><div><span className="text-foreground/90 font-medium">Город:</span><span className="ml-1.5 text-muted-foreground">{task.city}</span></div></div>
@@ -361,14 +458,46 @@ export default function TaskDetailPage() {
           </div>
         </CardContent>
 
-        {!isOwner && (
-          <CardFooter className="pt-5 sm:pt-6 px-4 sm:px-6 border-t">
-            <Button size="lg" className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" onClick={handleRespond} disabled={!currentUser || isResponding || hasResponded}>
+        <CardFooter className="pt-5 sm:pt-6 px-4 sm:px-6 border-t flex flex-col sm:flex-row gap-3 items-center">
+          {!isOwner && task.status === 'open' && !hasResponded && !task.executorId && (
+            <Button 
+              size="lg" 
+              className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" 
+              onClick={handleRespond} 
+              disabled={!currentUser || isResponding}
+            >
               {isResponding ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <MessageSquare className="mr-2 h-5 w-5" />}
-              {currentUser ? (hasResponded ? "Вы уже откликнулись" : (isResponding ? "Отправка..." : "Откликнуться на задание")) : "Войдите, чтобы откликнуться"}
+              {currentUser ? "Откликнуться на задание" : "Войдите, чтобы откликнуться"}
             </Button>
-          </CardFooter>
-        )}
+          )}
+          {!isOwner && task.status === 'open' && hasResponded && !isExecutor && !task.executorId && (
+            <Button 
+              size="lg" 
+              variant="default"
+              className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" 
+              onClick={handleStartTask}
+              disabled={!currentUser || isProcessingAction}
+            >
+              {isProcessingAction ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-2 h-5 w-5" />}
+              Приступить к выполнению
+            </Button>
+          )}
+           {!isOwner && task.status === 'open' && hasResponded && isExecutor && ( // Уже откликнулся и стал исполнителем, но статус еще open (маловероятно, но на всякий)
+            <p className="text-sm text-green-400">Вы уже приступили к этому заданию (ожидает обновления статуса).</p>
+          )}
+          {!isOwner && task.status === 'in_progress' && isExecutor && (
+            <p className="text-sm text-green-400">Вы выполняете это задание. Начато: {task.startedAt || 'Недавно'}.</p>
+          )}
+           {!isOwner && task.status === 'in_progress' && !isExecutor && task.executorId && (
+            <p className="text-sm text-yellow-400">Задание уже выполняется другим исполнителем.</p>
+          )}
+          {!isOwner && (task.status === 'completed' || task.status === 'cancelled') && (
+             <p className="text-sm text-muted-foreground">Задание завершено или отменено. Отклики больше не принимаются.</p>
+          )}
+           {!isOwner && hasResponded && task.status === 'open' && !isExecutor && task.executorId && ( // Откликнулся, но кто-то другой уже исполнитель
+            <p className="text-sm text-muted-foreground">Задание уже взято другим исполнителем.</p>
+          )}
+        </CardFooter>
       </Card>
 
       {isOwner && (
@@ -398,14 +527,15 @@ export default function TaskDetailPage() {
                       <div className="flex-1">
                         <p className="font-semibold text-foreground">{response.responderName || "Анонимный исполнитель"}</p>
                         <p className="text-xs text-muted-foreground">Откликнулся: {response.respondedAt}</p>
-                        {/* Можно добавить еще детали из response.message или другие поля */}
+                        {response.message && <p className="text-sm mt-1 italic">"{response.message}"</p>}
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap justify-end gap-2">
-                      <Button variant="outline" size="sm" className="text-xs hover:border-red-500/50 hover:text-red-500" onClick={() => handleResponseAction(response.id, "rejected")}>
+                      {/* TODO: Добавить кнопки "Принять отклик" / "Отклонить отклик" */}
+                      <Button variant="outline" size="sm" className="text-xs hover:border-red-500/50 hover:text-red-500" onClick={() => console.log("Отклонить (демо)", response.id)}>
                         <X className="h-4 w-4 mr-1.5" /> Отклонить (демо)
                       </Button>
-                      <Button variant="default" size="sm" className="text-xs hover:bg-green-500/90" onClick={() => handleResponseAction(response.id, "accepted")}>
+                      <Button variant="default" size="sm" className="text-xs hover:bg-green-500/90" onClick={() => console.log("Принять (демо)", response.id)}>
                         <Check className="h-4 w-4 mr-1.5" /> Принять (демо)
                       </Button>
                     </div>
@@ -419,3 +549,4 @@ export default function TaskDetailPage() {
     </div>
   );
 }
+
