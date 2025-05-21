@@ -202,49 +202,124 @@ export default function HomePage() {
 
       <section id="how-it-works" className="w-full py-12 md:py-24">
         <div className="container px-4 md:px-6">
-          <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl text-center mb-12">Как это работает?</h2>
+          <div className="text-center mb-12">
+            <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm mb-3">Простой процесс</div>
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Как это работает?</h2>
+            <p className="mt-4 max-w-[800px] mx-auto text-muted-foreground md:text-lg">
+              Наша платформа предлагает интуитивно понятный процесс как для заказчиков, так и для исполнителей
+            </p>
+          </div>
           <div className="grid gap-8 md:gap-10 grid-cols-1 md:grid-cols-2">
-            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm">
-              <CardHeader>
+            {/* Карточка для заказчиков */}
+            <Card className="overflow-hidden border-accent/10 p-0 shadow-xl hover:shadow-accent/40 transition-all duration-300 hover:scale-105 group">
+              <div className="bg-gradient-to-r from-primary to-primary/80 p-6">
                 <div className="flex items-center">
-                  <div className="p-2 rounded-full bg-accent/10 text-accent mr-3">
-                    <Users className="h-6 w-6" />
+                  <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full text-white mr-4">
+                    <Users className="h-8 w-8" />
                   </div>
-                  <CardTitle className="text-2xl">Для заказчиков</CardTitle>
+                  <CardTitle className="text-2xl sm:text-3xl text-white">Для заказчиков</CardTitle>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3 text-muted-foreground">
-                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">1</span> <strong>Опубликуйте задание:</strong> Опишите, что нужно сделать, укажите бюджет.</p>
-                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">2</span> <strong>Получайте отклики:</strong> Исполнители из Ирбита предложат свои услуги.</p>
-                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">3</span> <strong>Выберите лучшего:</strong> Свяжитесь с подходящим исполнителем и договоритесь о деталях.</p>
-                <Button asChild className="mt-4 w-full">
-                  <Link href="/create-task">Разместить задание</Link>
-                </Button>
+              </div>
+              <CardContent className="space-y-5 p-6 sm:p-8">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">1</div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Опубликуйте задание</h4>
+                    <p className="text-muted-foreground">Опишите, что нужно сделать, укажите бюджет и сроки выполнения работы.</p>
+                  </div>
+                </div>
+                
+                <div className="w-full border-t border-border my-2 opacity-30" />
+                
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">2</div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Получайте отклики</h4>
+                    <p className="text-muted-foreground">Исполнители из Ирбита предложат свои услуги и цены на выполнение.</p>
+                  </div>
+                </div>
+                
+                <div className="w-full border-t border-border my-2 opacity-30" />
+                
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">3</div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Выберите лучшего</h4>
+                    <p className="text-muted-foreground">Свяжитесь с подходящим исполнителем, обсудите детали и получите результат.</p>
+                  </div>
+                </div>
+                
+                <div className="mt-8 relative">
+                  <Button asChild size="lg" className="w-full py-6 shadow-lg font-semibold">
+                    <Link href="/create-task">
+                      Разместить задание 
+                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </Button>
+                  <div className="absolute -right-2 -top-2 bg-accent text-accent-foreground text-xs font-medium px-2 py-1 rounded animate-pulse">
+                    Бесплатно
+                  </div>
+                </div>
               </CardContent>
             </Card>
-            <Card className="p-6 shadow-lg hover:shadow-accent/30 transition-all duration-300 hover:scale-105 bg-card/70 backdrop-blur-sm">
-              <CardHeader>
+            
+            {/* Карточка для исполнителей */}
+            <Card className="overflow-hidden border-accent/10 p-0 shadow-xl hover:shadow-accent/40 transition-all duration-300 hover:scale-105 group">
+              <div className="bg-gradient-to-r from-accent to-accent/80 p-6">
                 <div className="flex items-center">
-                  <div className="p-2 rounded-full bg-accent/10 text-accent mr-3">
-                    <Briefcase className="h-6 w-6" />
+                  <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full text-white mr-4">
+                    <Briefcase className="h-8 w-8" />
                   </div>
-                  <CardTitle className="text-2xl">Для исполнителей</CardTitle>
+                  <CardTitle className="text-2xl sm:text-3xl text-white">Для исполнителей</CardTitle>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3 text-muted-foreground">
-                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">1</span> <strong>Найдите задания:</strong> Просматривайте новые заказы в Ирбите по вашей специализации.</p>
-                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">2</span> <strong>Предложите услуги:</strong> Откликайтесь на интересные задания, указывайте свою цену.</p>
-                <p className="flex items-center"><span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2 text-sm font-bold">3</span> <strong>Выполняйте и зарабатывайте:</strong> Договаривайтесь с заказчиками и получайте оплату.</p>
-                <Button asChild className="mt-4 w-full">
-                  <Link href="/tasks">Найти задания</Link>
-                </Button>
+              </div>
+              <CardContent className="space-y-5 p-6 sm:p-8">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-accent text-accent-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">1</div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Найдите задания</h4>
+                    <p className="text-muted-foreground">Просматривайте новые заказы в Ирбите по вашей специализации и опыту.</p>
+                  </div>
+                </div>
+                
+                <div className="w-full border-t border-border my-2 opacity-30" />
+                
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-accent text-accent-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">2</div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Предложите услуги</h4>
+                    <p className="text-muted-foreground">Откликайтесь на интересные задания, указывайте свою цену и сроки выполнения.</p>
+                  </div>
+                </div>
+                
+                <div className="w-full border-t border-border my-2 opacity-30" />
+                
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-accent text-accent-foreground mr-4 mt-0.5 text-sm font-bold group-hover:scale-110 transition-transform">3</div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">Выполняйте и зарабатывайте</h4>
+                    <p className="text-muted-foreground">Договаривайтесь с заказчиками, выполняйте работу и получайте оплату.</p>
+                  </div>
+                </div>
+                
+                <div className="mt-8 relative">
+                  <Button asChild size="lg" variant="outline" className="w-full py-6 border-accent text-accent hover:bg-accent/10 font-semibold">
+                    <Link href="/tasks">
+                      Найти задания
+                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </Button>
+                  <div className="absolute -right-2 -top-2 bg-primary text-primary-foreground text-xs font-medium px-2 py-1 rounded animate-pulse">
+                    Начните сейчас
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </section>
 
-      {/* Новый раздел с отзывами */}
+      {/* Раздел с отзывами */}
       <section id="testimonials" className="w-full py-12 md:py-24 bg-muted/30">
         <div className="container px-4 md:px-6">
           <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
@@ -274,7 +349,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Добавим призыв к действию в конце */}
+      {/* Призыв к действию в конце */}
       <section className="w-full py-12 md:py-16 bg-accent/10">
         <div className="container px-4 md:px-6 text-center">
           <div className="flex flex-col items-center max-w-3xl mx-auto">
@@ -294,7 +369,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Добавим блок с преимуществами безопасности */}
+      {/* Блок с преимуществами безопасности */}
       <section className="w-full py-12 md:py-20">
         <div className="container px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
