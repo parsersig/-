@@ -1,5 +1,4 @@
 "use client";
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -7,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, Clock, ListChecks, Loader2, MessageCircle } from "lucide-react";
+import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, Clock, ListChecks, Loader2, MessageCircle, ClipboardList, ClipboardCheck } from "lucide-react";
 import { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
@@ -34,19 +33,19 @@ const formatDate = (dateInput: string | Date | Timestamp | undefined): string =>
 };
 
 const formatDateTime = (dateTimeInput: string | Date | Timestamp | undefined): string => {
-    if (!dateTimeInput) return "Недавно";
-    let date: Date;
-    if (dateTimeInput instanceof Timestamp) {
-        date = dateTimeInput.toDate();
-    } else if (typeof dateTimeInput === 'string') {
-        date = new Date(dateTimeInput);
-    } else if (dateTimeInput instanceof Date) {
-        date = dateTimeInput;
-    } else {
-        return "Некорректное время";
-    }
-    if (isNaN(date.getTime())) return "Некорректное время";
-    return date.toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (!dateTimeInput) return "Недавно";
+  let date: Date;
+  if (dateTimeInput instanceof Timestamp) {
+    date = dateTimeInput.toDate();
+  } else if (typeof dateTimeInput === 'string') {
+    date = new Date(dateTimeInput);
+  } else if (dateTimeInput instanceof Date) {
+    date = dateTimeInput;
+  } else {
+    return "Некорректное время";
+  }
+  if (isNaN(date.getTime())) return "Некорректное время";
+  return date.toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
 // Расширяем тип ReviewData, добавляя taskTitle
@@ -60,61 +59,40 @@ export default function ProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  
+
   // Заглушки для статистики и отзывов
   const placeholderReviews: ExtendedReviewData[] = [
-    {
-      id: '1',
-      reviewerId: 'guest1',
-      reviewerName: 'Елена П.',
-      reviewerPhotoURL: 'https://placehold.co/40x40.png',
-      reviewedUserId: user?.uid || 'current_user',
-      rating: 5,
-      comment: 'Отличный исполнитель! Все сделал быстро и качественно. Рекомендую!',
-      createdAt: formatDate(new Date(2024, 4, 15)), 
-      taskTitle: 'Ремонт ванной комнаты'
-    },
-    {
-      id: '2',
-      reviewerId: 'guest2',
-      reviewerName: 'Алексей С.',
-      reviewerPhotoURL: 'https://placehold.co/40x40.png',
-      reviewedUserId: user?.uid || 'current_user',
-      rating: 4,
-      comment: 'Работа выполнена хорошо, но немного задержали по срокам. В целом доволен.',
-      createdAt: formatDate(new Date(2024, 3, 20)),
-      taskTitle: 'Разработка логотипа'
-    }
+    { id: '1', reviewerId: 'guest1', reviewerName: 'Елена П.', reviewerPhotoURL: 'https://placehold.co/40x40.png', reviewedUserId: user?.uid || 'current_user', rating: 5, comment: 'Отличный исполнитель! Все сделал быстро и качественно. Рекомендую!', createdAt: formatDate(new Date(2024, 4, 15)), taskTitle: 'Ремонт ванной комнаты' },
+    { id: '2', reviewerId: 'guest2', reviewerName: 'Алексей С.', reviewerPhotoURL: 'https://placehold.co/40x40.png', reviewedUserId: user?.uid || 'current_user', rating: 4, comment: 'Работа выполнена хорошо, но немного задержали по срокам. В целом доволен.', createdAt: formatDate(new Date(2024, 3, 20)), taskTitle: 'Разработка логотипа' }
   ];
 
   const fetchUserProfile = useCallback(async (currentUser: User) => {
     if (!db || !currentUser?.uid) {
-        console.warn("Firestore DB or currentUser UID is not available for fetching profile.");
-        setIsLoadingProfile(false);
-        return;
+      console.warn("Firestore DB or currentUser UID is not available for fetching profile.");
+      setIsLoadingProfile(false);
+      return;
     }
     setIsLoadingProfile(true);
     try {
       const profileRef = doc(db, "userProfiles", currentUser.uid);
       const profileSnap = await getDoc(profileRef) as DocumentSnapshot<UserProfile>;
-      
       if (profileSnap.exists()) {
         setUserProfile(profileSnap.data());
       } else {
         // Профиль еще не создан, создаем базовый
         console.log("No user profile found for UID:", currentUser.uid, "Creating one now.");
         const newProfileData: UserProfile = {
-            uid: currentUser.uid,
-            email: currentUser.email || undefined,
-            displayName: currentUser.displayName || "Новый пользователь",
-            photoURL: currentUser.photoURL || undefined,
-            registrationDate: currentUser.metadata.creationTime ? Timestamp.fromDate(new Date(currentUser.metadata.creationTime)) : undefined,
-            lastSignInTime: currentUser.metadata.lastSignInTime ? Timestamp.fromDate(new Date(currentUser.metadata.lastSignInTime)) : undefined,
-            city: "Ирбит", 
-            aboutMe: "",
-            specializations: [],
-            phoneVerified: false, // Добавлено обязательное поле
-            // другие поля можно инициализировать по умолчанию или оставить undefined
+          uid: currentUser.uid,
+          email: currentUser.email || undefined,
+          displayName: currentUser.displayName || "Новый пользователь",
+          photoURL: currentUser.photoURL || undefined,
+          registrationDate: currentUser.metadata.creationTime ? Timestamp.fromDate(new Date(currentUser.metadata.creationTime)) : undefined,
+          lastSignInTime: currentUser.metadata.lastSignInTime ? Timestamp.fromDate(new Date(currentUser.metadata.lastSignInTime)) : undefined,
+          city: "Ирбит",
+          aboutMe: "",
+          specializations: [],
+          phoneVerified: false, // Добавлено обязательное поле
+          // другие поля можно инициализировать по умолчанию или оставить undefined
         };
         await setDoc(doc(db, "userProfiles", currentUser.uid), newProfileData);
         setUserProfile(newProfileData);
@@ -149,21 +127,20 @@ export default function ProfilePage() {
 
   const handleProfileUpdateSuccess = (updatedData: EditUserProfileFormValues) => {
     setUserProfile(prev => {
-        const currentPhotoURL = prev?.photoURL || user?.photoURL || undefined;
-        const currentDisplayName = prev?.displayName || user?.displayName || "Пользователь";
-        
-        return {
-            ...(prev as UserProfile), // Ensure prev is treated as UserProfile
-            uid: user!.uid, // user should not be null here
-            email: user!.email || undefined,
-            displayName: currentDisplayName, // Keep existing displayName from profile or auth
-            photoURL: currentPhotoURL, // Keep existing photoURL from profile or auth
-            registrationDate: prev?.registrationDate || (user?.metadata.creationTime ? Timestamp.fromDate(new Date(user.metadata.creationTime)) : undefined),
-            lastSignInTime: prev?.lastSignInTime || (user?.metadata.lastSignInTime ? Timestamp.fromDate(new Date(user.metadata.lastSignInTime)) : undefined),
-            city: prev?.city || "Ирбит",
-            phoneVerified: prev?.phoneVerified || false, // Добавлено обязательное поле
-            ...updatedData, // Apply updates from the form
-        };
+      const currentPhotoURL = prev?.photoURL || user?.photoURL || undefined;
+      const currentDisplayName = prev?.displayName || user?.displayName || "Пользователь";
+      return {
+        ...(prev as UserProfile), // Ensure prev is treated as UserProfile
+        uid: user!.uid, // user should not be null here
+        email: user!.email || undefined,
+        displayName: currentDisplayName, // Keep existing displayName from profile or auth
+        photoURL: currentPhotoURL, // Keep existing photoURL from profile or auth
+        registrationDate: prev?.registrationDate || (user?.metadata.creationTime ? Timestamp.fromDate(new Date(user.metadata.creationTime)) : undefined),
+        lastSignInTime: prev?.lastSignInTime || (user?.metadata.lastSignInTime ? Timestamp.fromDate(new Date(user.metadata.lastSignInTime)) : undefined),
+        city: prev?.city || "Ирбит",
+        phoneVerified: prev?.phoneVerified || false, // Добавлено обязательное поле
+        ...updatedData, // Apply updates from the form
+      };
     });
     setIsEditDialogOpen(false);
   };
@@ -192,14 +169,14 @@ export default function ProfilePage() {
           <CardContent>
             <p className="text-muted-foreground mb-6">Для доступа к этой странице необходимо войти в систему.</p>
             <Button size="lg" asChild className="hover-scale">
-                <Link href="/">На главную</Link>
+              <Link href="/">На главную</Link>
             </Button>
           </CardContent>
         </Card>
       </div>
     );
   }
-  
+
   const displayPhotoURL = userProfile?.photoURL || user.photoURL || undefined;
   const displayDisplayName = userProfile?.displayName || user.displayName || "Пользователь";
 
@@ -214,14 +191,12 @@ export default function ProfilePage() {
             <div className="absolute bottom-0 right-0 w-60 h-60 bg-primary/30 rounded-full translate-x-1/3 translate-y-1/3 blur-2xl"></div>
           </div>
         </div>
-        
         <div className="relative px-6 sm:px-10 pb-6 -mt-16 flex flex-col sm:flex-row items-center sm:items-end gap-6">
           <Avatar className="h-32 w-32 sm:h-36 sm:w-36 border-4 border-background shadow-xl">
             <AvatarImage src={displayPhotoURL} alt={displayDisplayName} />
             <AvatarFallback className="text-5xl sm:text-6xl bg-muted">
               {displayDisplayName ? displayDisplayName.charAt(0).toUpperCase() : <UserCircle className="h-20 w-20"/>}
             </AvatarFallback>
-            
             {/* Индикатор верифицированности */}
             {user.emailVerified && (
               <TooltipProvider>
@@ -238,33 +213,27 @@ export default function ProfilePage() {
               </TooltipProvider>
             )}
           </Avatar>
-          
           <div className="flex-1 text-center sm:text-left space-y-2 pb-2">
             <div className="flex flex-col sm:flex-row items-center sm:items-baseline gap-1 sm:gap-2">
               <h1 className="text-2xl sm:text-3xl font-bold">{displayDisplayName}</h1>
               <div className="flex items-center gap-1.5">
-                <Badge variant="outline" className="px-2 py-0.5 border-green-500/30 bg-green-500/5 text-green-500">
-                  Исполнитель
-                </Badge>
-                <Badge variant="outline" className="px-2 py-0.5 border-blue-500/30 bg-blue-500/5 text-blue-500">
-                  Проверен
-                </Badge>
+                <Badge variant="outline" className="px-2.5 py-1 text-xs font-medium border-green-600/40 bg-green-500/10 text-green-600"> Исполнитель </Badge>
+                <Badge variant="outline" className="px-2.5 py-1 text-xs font-medium border-blue-600/40 bg-blue-500/10 text-blue-600"> Проверен </Badge>
               </div>
             </div>
-            
             <p className="text-muted-foreground">
-              {userProfile?.city || "Ирбит"} {userProfile?.age && `• ${userProfile.age} лет`}
+              {userProfile?.city || "Ирбит"}
+              {userProfile?.age && `• ${userProfile.age} лет`}
             </p>
-            
             <p className="text-sm text-muted-foreground/80">
               На сайте с {formatDate(userProfile?.registrationDate || user.metadata.creationTime)}
             </p>
-            
             <div className="pt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="px-4">
-                    <Edit className="h-4 w-4 mr-2" /> Редактировать профиль
+                    <Edit className="h-4 w-4 mr-2" />
+                    Редактировать профиль
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
@@ -275,8 +244,8 @@ export default function ProfilePage() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="overflow-y-auto pr-2 flex-grow">
-                    <EditProfileForm 
-                      currentUser={user} 
+                    <EditProfileForm
+                      currentUser={user}
                       initialProfileData={userProfile || { uid: user.uid } as UserProfile}
                       onProfileUpdated={handleProfileUpdateSuccess}
                       onCancel={() => setIsEditDialogOpen(false)}
@@ -294,8 +263,7 @@ export default function ProfilePage() {
         <Card className="md:col-span-2 shadow-lg bg-card/90 backdrop-blur-sm border border-accent/10">
           <CardHeader className="pb-3">
             <CardTitle className="text-xl flex items-center">
-              <UserCircle className="h-5 w-5 mr-2 text-accent"/>
-              Основная информация
+              <UserCircle className="h-5 w-5 mr-2 text-accent"/> Основная информация
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -303,7 +271,7 @@ export default function ProfilePage() {
               <div className="space-y-1">
                 <p className="font-medium text-muted-foreground">Email</p>
                 <p className="flex items-center font-medium text-foreground">
-                  {user.email || "Не указан"} 
+                  {user.email || "Не указан"}
                   {user.emailVerified && (
                     <TooltipProvider>
                       <Tooltip>
@@ -331,13 +299,10 @@ export default function ProfilePage() {
                 <p className="font-medium text-foreground">{formatDateTime(userProfile?.lastSignInTime || user.metadata.lastSignInTime)}</p>
               </div>
             </div>
-            
             <Separator />
-            
             <div className="space-y-3">
               <h3 className="text-lg font-medium flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-accent"/>
-                О себе
+                <Briefcase className="h-5 w-5 text-accent"/> О себе
               </h3>
               {isLoadingProfile ? (
                 <div className="animate-pulse h-24 bg-muted/40 rounded-md"></div>
@@ -351,13 +316,10 @@ export default function ProfilePage() {
                 </p>
               )}
             </div>
-            
             <Separator />
-            
             <div className="space-y-3">
               <h3 className="text-lg font-medium flex items-center gap-2">
-                <ListChecks className="h-5 w-5 text-accent"/>
-                Специализации
+                <ListChecks className="h-5 w-5 text-accent"/> Специализации
               </h3>
               {isLoadingProfile ? (
                 <div className="animate-pulse h-10 bg-muted/40 rounded-md"></div>
@@ -382,21 +344,24 @@ export default function ProfilePage() {
         <Card className="md:col-span-1 shadow-lg bg-card/90 backdrop-blur-sm h-fit border border-accent/10">
           <CardHeader className="pb-3">
             <CardTitle className="text-xl flex items-center">
-              <TrendingUp className="h-5 w-5 mr-2 text-accent"/>
-              Статистика
+              <TrendingUp className="h-5 w-5 mr-2 text-accent"/> Статистика
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="bg-muted/30 rounded-lg p-4 hover:bg-muted/40 transition-colors border border-accent/5">
-              <p className="text-sm font-medium text-muted-foreground">Заданий создано</p>
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-medium text-muted-foreground">Заданий создано</p>
+                <ClipboardList className="h-5 w-5 text-accent/80" />
+              </div>
               <p className="text-3xl font-bold text-accent mt-1">{userProfile?.tasksCreated || 0}</p>
             </div>
-            
             <div className="bg-muted/30 rounded-lg p-4 hover:bg-muted/40 transition-colors border border-accent/5">
-              <p className="text-sm font-medium text-muted-foreground">Заданий выполнено</p>
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-medium text-muted-foreground">Заданий выполнено</p>
+                <ClipboardCheck className="h-5 w-5 text-accent/80" />
+              </div>
               <p className="text-3xl font-bold text-accent mt-1">{userProfile?.tasksCompleted || 0}</p>
             </div>
-            
             <div className="bg-muted/30 rounded-lg p-4 hover:bg-muted/40 transition-colors border border-accent/5">
               <div className="flex justify-between items-center">
                 <p className="text-sm font-medium text-muted-foreground">Рейтинг</p>
@@ -420,8 +385,7 @@ export default function ProfilePage() {
         <CardHeader className="pb-3">
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl flex items-center">
-              <Star className="h-5 w-5 mr-2 text-accent"/>
-              Рейтинг и Отзывы
+              <Star className="h-5 w-5 mr-2 text-accent"/> Рейтинг и Отзывы
             </CardTitle>
             <div className="flex items-baseline text-sm">
               <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 mr-1" />
@@ -434,12 +398,11 @@ export default function ProfilePage() {
             </div>
           </div>
         </CardHeader>
-        
         <CardContent>
           {placeholderReviews.length > 0 ? (
             <div className="space-y-4">
               {placeholderReviews.map((review) => (
-                <Card key={review.id} className="p-4 bg-muted/20 rounded-md shadow-sm overflow-hidden">
+                <Card key={review.id} className="p-4 bg-muted/20 rounded-lg shadow-sm overflow-hidden border border-border/30">
                   <div className="flex items-start space-x-4">
                     <Avatar className="h-10 w-10 border">
                       <AvatarImage src={review.reviewerPhotoURL || undefined} alt={review.reviewerName} />
@@ -447,26 +410,23 @@ export default function ProfilePage() {
                         {review.reviewerName.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    
                     <div className="flex-1">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <h4 className="font-medium">{review.reviewerName}</h4>
                         <div className="flex text-yellow-400">
                           {[...Array(5)].map((_, i) => (
-                            <Star 
-                              key={i} 
-                              className={`h-4 w-4 ${i < review.rating ? 'fill-yellow-400' : 'fill-muted stroke-yellow-500/50'}`} 
+                            <Star
+                              key={i}
+                              className={`h-4 w-4 ${i < review.rating ? 'fill-yellow-400' : 'fill-muted stroke-yellow-500/50'}`}
                             />
                           ))}
                         </div>
                       </div>
-                      
                       {review.taskTitle && (
                         <Badge variant="outline" className="mt-1 mb-1 bg-background/50">
                           {review.taskTitle}
                         </Badge>
                       )}
-                      
                       <p className="text-xs text-muted-foreground mb-1">{review.createdAt}</p>
                       <p className="text-sm text-muted-foreground italic">"{review.comment}"</p>
                     </div>
