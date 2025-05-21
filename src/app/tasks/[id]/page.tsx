@@ -9,13 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Briefcase, CalendarDays, Coins, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle, Users, Check, X, ThumbsUp, ThumbsDown, User, PlayCircle } from "lucide-react";
-import type { StoredTask, ResponseData, UserProfile } from "@/lib/schemas";
+import type { StoredTask, ResponseData, UserProfile, ChatData } from "@/lib/schemas";
 import { useToast } from "@/hooks/use-toast";
 import { db, auth } from "@/lib/firebase";
 import {
   doc, getDoc, updateDoc, increment, Timestamp,
   collection, addDoc, serverTimestamp, query, where,
-  orderBy, onSnapshot, getDocs,
+  orderBy, onSnapshot, getDocs, setDoc, // Added setDoc
   type QuerySnapshot, type QueryDocumentSnapshot, type FirestoreError, type Firestore
 } from "firebase/firestore";
 import type { User as FirebaseUser } from "firebase/auth";
@@ -44,7 +44,7 @@ const formatResponseDate = (date: any): string => {
   } else {
     return 'неверный формат';
   }
-  if (isNaN(d.getTime())) return 'неверный формат';
+  if (isNaN(d.getTime())) return 'Неверный формат даты';
   return d.toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
@@ -75,13 +75,15 @@ export default function TaskDetailPage() {
   const [isLoadingOwner, setIsLoadingOwner] = useState(false);
   
   const [isResponding, setIsResponding] = useState(false);
-  const [isProcessingAction, setIsProcessingAction] = useState(false); // Для кнопки "Приступить"
+  const [isProcessingAction, setIsProcessingAction] = useState(false); 
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [hasResponded, setHasResponded] = useState(false);
-  const [isExecutor, setIsExecutor] = useState(false); // Текущий пользователь - исполнитель этого задания?
+  const [isExecutor, setIsExecutor] = useState(false); 
   
   const [taskResponses, setTaskResponses] = useState<ResponseData[]>([]);
   const [isLoadingResponses, setIsLoadingResponses] = useState(false);
+  const [isInitiatingChat, setIsInitiatingChat] = useState(false);
+
 
   useEffect(() => {
     if (auth) {
@@ -111,7 +113,7 @@ export default function TaskDetailPage() {
         console.error("Error incrementing view count:", error);
       }
     }
-  }, []); // db убрано из зависимостей, т.к. он импортируется и не меняется
+  }, []); 
 
   useEffect(() => {
     if (taskId && db) {
@@ -122,13 +124,13 @@ export default function TaskDetailPage() {
           const taskRef = doc(firestore, "tasks", taskId);
           const taskSnap = await getDoc(taskRef);
           if (taskSnap.exists()) {
-            const taskData = taskSnap.data() as StoredTask;
+            const taskData = taskSnap.data() as StoredTask; // Assuming StoredTask has all needed fields
             const fetchedTask = {
               ...taskData,
               id: taskSnap.id,
-              postedDate: formatDate(taskData.postedDate),
+              postedDate: formatDate(taskData.postedDate as Timestamp),
               firestorePostedDate: taskData.postedDate as Timestamp,
-              startedAt: taskData.startedAt ? formatStartedDate(taskData.startedAt) : undefined,
+              startedAt: taskData.startedAt ? formatStartedDate(taskData.startedAt as Timestamp) : undefined,
               firestoreStartedAt: taskData.startedAt as Timestamp | undefined,
             } as StoredTask;
             setTask(fetchedTask);
@@ -174,10 +176,9 @@ export default function TaskDetailPage() {
     }
   }, [taskId, incrementViewCount, toast]);
 
-  // Загрузка откликов, если текущий пользователь - автор задания
  useEffect(() => {
     if (!db || !task || !currentUser || task.userId !== currentUser.uid) {
-      setTaskResponses([]); // Очищаем отклики если условия не выполнены
+      setTaskResponses([]); 
       setIsLoadingResponses(false);
       return;
     }
@@ -185,13 +186,13 @@ export default function TaskDetailPage() {
     setIsLoadingResponses(true);
     const firestore = db as Firestore;
     const responsesCollectionRef = collection(firestore, "responses");
-    const q = query(
+    const responsesQuery = query(
       responsesCollectionRef,
       where("taskId", "==", task.id),
       orderBy("respondedAt", "desc")
     );
 
-    const unsubscribeResponses = onSnapshot(q, 
+    const unsubscribeResponses = onSnapshot(responsesQuery, 
       (snapshot: QuerySnapshot) => {
         const responses: ResponseData[] = [];
         snapshot.forEach((docSnap: QueryDocumentSnapshot) => {
@@ -199,7 +200,7 @@ export default function TaskDetailPage() {
           responses.push({
             id: docSnap.id,
             ...data,
-            respondedAt: formatResponseDate(data.respondedAt),
+            respondedAt: formatResponseDate(data.respondedAt as Timestamp),
             firestoreRespondedAt: data.respondedAt as Timestamp,
           } as ResponseData);
         });
@@ -208,41 +209,43 @@ export default function TaskDetailPage() {
       }, 
       (error: FirestoreError) => {
         console.error("Error fetching task responses:", error);
-        if (error.message && error.message.includes("index")) {
+        if (error.code === 'failed-precondition' && error.message.includes("index")) {
            toast({
             title: "Ошибка базы данных",
-            description: `Для отображения откликов требуется конфигурация индекса в Firestore. Пожалуйста, создайте его, перейдя по ссылке (которую можно найти в консоли разработчика, если она не была показана ранее) или обратитесь к администратору. Ошибка: ${error.message}`,
+            description: `Для отображения откликов требуется создание индекса в Firestore. ${error.message}`,
             variant: "destructive",
             duration: 15000,
           });
         } else {
-          toast({ title: "Ошибка", description: `Не удалось загрузить отклики на задание: ${error.message}`, variant: "destructive" });
+          toast({ title: "Ошибка откликов", description: `Не удалось загрузить отклики: ${error.message}`, variant: "destructive" });
         }
         setTaskResponses([]);
         setIsLoadingResponses(false);
       }
     );
     return () => unsubscribeResponses();
-  }, [task, currentUser, toast]); // db убрано из зависимостей
+  }, [task, currentUser, toast]);
 
-   // Проверка, откликался ли уже пользователь и является ли он исполнителем
    useEffect(() => {
-    if (!db || !task || !currentUser || task.userId === currentUser.uid) {
+    if (!db || !task || !currentUser ) {
       setHasResponded(false);
       setIsExecutor(false);
       return;
     }
-
-    // Проверка, является ли текущий пользователь исполнитеlem этого задания
+    
     if (task.executorId === currentUser.uid) {
       setIsExecutor(true);
-      setHasResponded(true); // Если он исполнитель, значит он как минимум откликнулся (или был назначен)
-      return; // Дальнейшая проверка hasResponded не нужна
+      setHasResponded(true); 
+      return; 
     } else {
-      setIsExecutor(false); // Сбрасываем, если он не исполнитель этого задания
+      setIsExecutor(false);
     }
     
-    // Проверка, откликался ли пользователь, если он НЕ исполнитель
+    if (task.userId === currentUser.uid) { // Автор не может откликаться и быть исполнителем через отклик
+        setHasResponded(false);
+        return;
+    }
+
     const firestore = db as Firestore;
     const responsesRef = collection(firestore, "responses");
     const q = query(responsesRef, where("taskId", "==", task.id), where("responderId", "==", currentUser.uid));
@@ -251,9 +254,9 @@ export default function TaskDetailPage() {
       setHasResponded(!querySnapshot.empty);
     }).catch(err => {
       console.error("Error checking response status", err);
-      toast({title: "Ошибка проверки отклика", description: err.message, variant: "destructive"});
+      toast({title: "Ошибка проверки отклика", description: (err as Error).message, variant: "destructive"});
     });
-  }, [task, currentUser, toast]); // db убрано
+  }, [task, currentUser, toast]);
 
   const handleRespond = async () => {
     if (!db || !task) {
@@ -268,7 +271,7 @@ export default function TaskDetailPage() {
       toast({ title: "Это ваше задание", description: "Вы не можете откликнуться на собственное задание.", variant: "default" });
       return;
     }
-    if (hasResponded && !isExecutor) { // Если уже откликнулся, но еще не исполнитель
+    if (hasResponded && !isExecutor) {
       toast({ title: "Вы уже откликались", description: "Вы уже отправляли отклик на это задание.", variant: "default" });
       return;
     }
@@ -289,7 +292,6 @@ export default function TaskDetailPage() {
         responderName: currentUser.displayName || "Анонимный исполнитель",
         responderPhotoURL: currentUser.photoURL || null,
         respondedAt: serverTimestamp(),
-        message: "", // Можно добавить поле для сопроводительного сообщения
       };
       await addDoc(collection(firestore, "responses"), responseData);
       toast({ 
@@ -297,7 +299,7 @@ export default function TaskDetailPage() {
         description: `Ваш отклик на задание «${task.title}» успешно отправлен и сохранен в базе данных!`, 
         duration: 7000 
       });
-      setHasResponded(true); // Обновляем состояние, что пользователь откликнулся
+      setHasResponded(true);
     } catch (error: any) {
       console.error("Failed to save response to Firestore", error);
       toast({ title: "Ошибка сохранения отклика", description: `Не удалось сохранить ваш отклик. ${error.message || "Пожалуйста, попробуйте еще раз."}`, variant: "destructive" });
@@ -330,11 +332,9 @@ export default function TaskDetailPage() {
         ...prev, 
         status: 'in_progress', 
         executorId: currentUser.uid, 
-        // startedAt будет обновлен при следующей загрузке или можно обновить локально с new Date()
-        // Для UI немедленного отображения, лучше обновить локально с new Date(), а firestoreStartedAt придет потом
         startedAt: formatStartedDate(new Date()) 
       }) : null);
-      setIsExecutor(true); // Теперь текущий пользователь - исполнитель
+      setIsExecutor(true); 
 
       toast({ title: "Работа начата!", description: `Вы приступили к выполнению задания «${task.title}».`, duration: 5000 });
     } catch (error: any) {
@@ -344,6 +344,53 @@ export default function TaskDetailPage() {
       setIsProcessingAction(false);
     }
   };
+
+  const handleInitiateChat = async (otherUserId: string, otherUserName: string | null, otherUserPhotoURL: string | null) => {
+    if (!db || !currentUser || !task) {
+        toast({ title: "Ошибка", description: "Необходимые данные для начала чата отсутствуют.", variant: "destructive" });
+        return;
+    }
+    setIsInitiatingChat(true);
+    const firestore = db as Firestore;
+    // Формируем уникальный ID для чата, сортируя ID участников
+    const participantsArray = [currentUser.uid, otherUserId].sort();
+    const generatedChatId = participantsArray.join('_'); // Простой способ генерации ID
+
+    try {
+        const chatRef = doc(firestore, "chats", generatedChatId);
+        const chatSnap = await getDoc(chatRef);
+
+        if (!chatSnap.exists()) {
+            // Чат не существует, создаем новый
+            const newChatData: Partial<ChatData> = { // Используем Partial, т.к. id будет у документа
+                participants: participantsArray,
+                participantNames: {
+                    [currentUser.uid]: currentUser.displayName || "Текущий Пользователь",
+                    [otherUserId]: otherUserName || "Другой Пользователь",
+                },
+                participantPhotoURLs: {
+                    [currentUser.uid]: currentUser.photoURL || null,
+                    [otherUserId]: otherUserPhotoURL || null,
+                },
+                taskId: task.id,
+                taskTitle: task.title,
+                lastMessageText: "",
+                lastMessageAt: null, // Будет обновляться при первом сообщении
+                createdAt: serverTimestamp() as Timestamp,
+            };
+            await setDoc(chatRef, newChatData);
+            console.log("New chat created with ID:", generatedChatId);
+        } else {
+            console.log("Chat already exists with ID:", generatedChatId);
+        }
+        router.push(`/messages?chatId=${generatedChatId}`);
+    } catch (error: any) {
+        console.error("Error initiating chat:", error);
+        toast({ title: "Ошибка чата", description: `Не удалось начать чат: ${error.message}`, variant: "destructive" });
+    } finally {
+        setIsInitiatingChat(false);
+    }
+};
 
 
   if (isLoading) {
@@ -368,7 +415,7 @@ export default function TaskDetailPage() {
       </div>
     );
   }
-  if (!task) return null; // Дополнительная защита, если task все еще undefined
+  if (!task) return null; 
   
   const isOwner = currentUser?.uid === task.userId;
 
@@ -420,11 +467,23 @@ export default function TaskDetailPage() {
                     </Avatar>
                     <div>
                       <p className="font-medium text-foreground">{taskOwner.displayName || "Заказчик"}</p>
-                      <div className="flex items-center space-x-2 text-xs mt-0.5" title="Отзывы о заказчике (демо)">
+                       <div className="flex items-center space-x-2 text-xs mt-0.5" title="Отзывы о заказчике (демо)">
                         <ThumbsUp className="h-3.5 w-3.5 text-green-500"/> <span className="text-green-400">15</span>
                         <ThumbsDown className="h-3.5 w-3.5 text-red-500"/> <span className="text-red-400">2</span>
                       </div>
                     </div>
+                    {!isOwner && currentUser && taskOwner && (
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleInitiateChat(taskOwner.uid, taskOwner.displayName || null, taskOwner.photoURL || null)}
+                            disabled={isInitiatingChat}
+                            className="ml-auto text-xs"
+                        >
+                            {isInitiatingChat ? <Loader2 className="h-4 w-4 animate-spin mr-1.5"/> : <MessageSquare className="h-4 w-4 mr-1.5"/>}
+                            Написать автору
+                        </Button>
+                    )}
                   </>
                 ) : (
                   <p>Информация о заказчике не найдена.</p>
@@ -449,7 +508,6 @@ export default function TaskDetailPage() {
             </div>
           )}
 
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 sm:gap-x-8 gap-y-3 sm:gap-y-4 text-sm border-t pt-5">
             <div className="flex items-center"><MapPin className="h-5 w-5 mr-2 sm:mr-3 text-accent/80 shrink-0" /><div><span className="text-foreground/90 font-medium">Город:</span><span className="ml-1.5 text-muted-foreground">{task.city}</span></div></div>
             <div className="flex items-center"><CalendarDays className="h-5 w-5 mr-2 sm:mr-3 text-accent/80 shrink-0" /><div><span className="text-foreground/90 font-medium">Опубликовано:</span><span className="ml-1.5 text-muted-foreground">{task.postedDate}</span></div></div>
@@ -459,30 +517,34 @@ export default function TaskDetailPage() {
         </CardContent>
 
         <CardFooter className="pt-5 sm:pt-6 px-4 sm:px-6 border-t flex flex-col sm:flex-row gap-3 items-center">
-          {!isOwner && task.status === 'open' && !hasResponded && !task.executorId && (
+          {!isOwner && task.status === 'open' && !hasResponded && !task.executorId && currentUser && (
             <Button 
               size="lg" 
               className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" 
               onClick={handleRespond} 
-              disabled={!currentUser || isResponding}
+              disabled={isResponding}
             >
               {isResponding ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <MessageSquare className="mr-2 h-5 w-5" />}
-              {currentUser ? "Откликнуться на задание" : "Войдите, чтобы откликнуться"}
+              Откликнуться на задание
             </Button>
           )}
-          {!isOwner && task.status === 'open' && hasResponded && !isExecutor && !task.executorId && (
+           {!isOwner && task.status === 'open' && !currentUser && (
+             <p className="text-sm text-muted-foreground"> <Link href="/" className="text-accent hover:underline">Войдите</Link>, чтобы откликнуться или написать автору.</p>
+           )}
+
+          {!isOwner && task.status === 'open' && hasResponded && !isExecutor && !task.executorId && currentUser && (
             <Button 
               size="lg" 
               variant="default"
               className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" 
               onClick={handleStartTask}
-              disabled={!currentUser || isProcessingAction}
+              disabled={isProcessingAction}
             >
               {isProcessingAction ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <PlayCircle className="mr-2 h-5 w-5" />}
               Приступить к выполнению
             </Button>
           )}
-           {!isOwner && task.status === 'open' && hasResponded && isExecutor && ( // Уже откликнулся и стал исполнителем, но статус еще open (маловероятно, но на всякий)
+           {!isOwner && task.status === 'open' && hasResponded && isExecutor && ( 
             <p className="text-sm text-green-400">Вы уже приступили к этому заданию (ожидает обновления статуса).</p>
           )}
           {!isOwner && task.status === 'in_progress' && isExecutor && (
@@ -494,7 +556,7 @@ export default function TaskDetailPage() {
           {!isOwner && (task.status === 'completed' || task.status === 'cancelled') && (
              <p className="text-sm text-muted-foreground">Задание завершено или отменено. Отклики больше не принимаются.</p>
           )}
-           {!isOwner && hasResponded && task.status === 'open' && !isExecutor && task.executorId && ( // Откликнулся, но кто-то другой уже исполнитель
+           {!isOwner && hasResponded && task.status === 'open' && !isExecutor && task.executorId && ( 
             <p className="text-sm text-muted-foreground">Задание уже взято другим исполнителем.</p>
           )}
         </CardFooter>
@@ -503,7 +565,7 @@ export default function TaskDetailPage() {
       {isOwner && (
         <Card className="mt-6 shadow-xl bg-card/80 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="flex items-center text-xl sm:text-2xl"><Users className="h-6 w-6 mr-3 text-accent" />Отклики на ваше задание</CardTitle>
+            <CardTitle className="flex items-center text-xl sm:text-2xl"><Users className="h-6 w-6 mr-3 text-accent" />Отклики на ваше задание ({taskResponses.length})</CardTitle>
             <CardDescription>Список исполнителей, которые откликнулись.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -529,16 +591,30 @@ export default function TaskDetailPage() {
                         <p className="text-xs text-muted-foreground">Откликнулся: {response.respondedAt}</p>
                         {response.message && <p className="text-sm mt-1 italic">"{response.message}"</p>}
                       </div>
+                       {currentUser && response.responderId && (
+                         <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleInitiateChat(response.responderId, response.responderName || null, response.responderPhotoURL || null)}
+                            disabled={isInitiatingChat}
+                            className="ml-auto text-xs"
+                          >
+                            {isInitiatingChat ? <Loader2 className="h-4 w-4 animate-spin mr-1.5"/> : <MessageSquare className="h-4 w-4 mr-1.5"/>}
+                            Написать
+                          </Button>
+                       )}
                     </div>
-                    <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap justify-end gap-2">
-                      {/* TODO: Добавить кнопки "Принять отклик" / "Отклонить отклик" */}
-                      <Button variant="outline" size="sm" className="text-xs hover:border-red-500/50 hover:text-red-500" onClick={() => console.log("Отклонить (демо)", response.id)}>
-                        <X className="h-4 w-4 mr-1.5" /> Отклонить (демо)
-                      </Button>
-                      <Button variant="default" size="sm" className="text-xs hover:bg-green-500/90" onClick={() => console.log("Принять (демо)", response.id)}>
-                        <Check className="h-4 w-4 mr-1.5" /> Принять (демо)
-                      </Button>
-                    </div>
+                    {/* В будущем здесь будут кнопки "Принять отклик" / "Отклонить отклик", если задание еще не в работе */}
+                    {task.status === 'open' && !task.executorId && (
+                        <div className="mt-3 pt-3 border-t border-border/50 flex flex-wrap justify-end gap-2">
+                          <Button variant="outline" size="sm" className="text-xs hover:border-red-500/50 hover:text-red-500" onClick={() => console.log("Отклонить (демо)", response.id)}>
+                            <X className="h-4 w-4 mr-1.5" /> Отклонить (демо)
+                          </Button>
+                          <Button variant="default" size="sm" className="text-xs hover:bg-green-500/90" onClick={() => console.log("Принять (демо)", response.id)}>
+                            <Check className="h-4 w-4 mr-1.5" /> Принять (демо)
+                          </Button>
+                        </div>
+                    )}
                   </li>
                 ))}
               </ul>
