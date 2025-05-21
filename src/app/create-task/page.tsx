@@ -1,4 +1,3 @@
-
 // src/app/create-task/page.tsx
 "use client";
 
@@ -77,10 +76,16 @@ export default function CreateTaskPage() {
     }
 
     try {
-      console.log("Attempting to save task to Firestore:", data);
+      // Явно проверяем и логируем userId
+      if (currentUser && currentUser.uid) {
+        console.log("Saving task with userId:", currentUser.uid);
+      } else {
+        console.error("currentUser.uid is undefined or null");
+      }
+      
       const docRef = await addDoc(collection(db, "tasks"), {
         ...data,
-        userId: currentUser.uid,
+        userId: currentUser.uid, // Убедимся, что userId сохраняется
         postedDate: serverTimestamp(),
         city: "Ирбит", // Пока оставляем город по умолчанию
         views: 0,

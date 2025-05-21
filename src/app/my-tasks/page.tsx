@@ -1,4 +1,3 @@
-
 // src/app/my-tasks/page.tsx
 "use client";
 
@@ -7,11 +6,10 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { ListChecks, Briefcase, MapPin, DollarSign, Eye, LogIn, UserCircle } from "lucide-react";
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import type { StoredTask } from '@/lib/schemas';
-
-const LOCAL_STORAGE_TASKS_KEY = 'irbit-freelance-tasks';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 
 export default function MyTasksPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -28,8 +26,8 @@ export default function MyTasksPage() {
     const unsubscribe = auth.onAuthStateChanged(currentUser => {
       setUser(currentUser);
       setIsLoadingAuth(false);
-      if (currentUser) {
-        loadUserTasks(currentUser.uid);
+      if (currentUser && db) {
+        fetchUserTasks(currentUser.uid);
       } else {
         setUserTasks([]);
         setIsLoadingTasks(false);
@@ -38,21 +36,49 @@ export default function MyTasksPage() {
     return () => unsubscribe();
   }, []);
 
-  const loadUserTasks = (userId: string) => {
+  const fetchUserTasks = async (userId: string) => {
     setIsLoadingTasks(true);
     try {
-      const storedTasksRaw = localStorage.getItem(LOCAL_STORAGE_TASKS_KEY);
-      if (storedTasksRaw) {
-        const allTasks: StoredTask[] = JSON.parse(storedTasksRaw);
-        const filteredTasks = allTasks.filter(task => task.userId === userId);
-        // Sort tasks by postedDate in descending order (newest first)
-        filteredTasks.sort((a, b) => new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime());
-        setUserTasks(filteredTasks);
-      } else {
+      console.log("Fetching tasks for userId:", userId);
+      
+      if (!db) {
+        console.error("Firestore database is not initialized");
         setUserTasks([]);
+        setIsLoadingTasks(false);
+        return;
       }
+      
+      // Создаем запрос к коллекции tasks, фильтруя по userId
+      const tasksQuery = query(
+        collection(db, "tasks"),
+        where("userId", "==", userId),
+        orderBy("postedDate", "desc")
+      );
+      
+      const querySnapshot = await getDocs(tasksQuery);
+      const fetchedTasks: StoredTask[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedTasks.push({
+          id: doc.id,
+          title: data.title,
+          description: data.description,
+          category: data.category,
+          budget: data.budget,
+          isNegotiable: data.isNegotiable,
+          contactInfo: data.contactInfo,
+          userId: data.userId,
+          postedDate: data.postedDate?.toDate?.() || new Date(),
+          city: data.city || "Ирбит",
+          views: data.views || 0
+        });
+      });
+      
+      console.log("Fetched user tasks:", fetchedTasks);
+      setUserTasks(fetchedTasks);
     } catch (e) {
-      console.error("Failed to load tasks from localStorage", e);
+      console.error("Failed to load tasks from Firestore", e);
       setUserTasks([]);
     }
     setIsLoadingTasks(false);
