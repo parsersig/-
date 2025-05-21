@@ -51,11 +51,11 @@ export type TaskFormValues = z.infer<typeof taskSchema>;
 // Тип для задач, хранящихся в Firestore и отображаемых
 export interface StoredTask extends TaskFormValues {
   id: string;
-  postedDate: string; // Уже сконвертированная строка для отображения
-  firestorePostedDate?: Timestamp; // Оригинальный Timestamp из Firestore для сортировки и т.д.
+  postedDate: string; 
+  firestorePostedDate?: Timestamp; 
   city: string;
   views: number;
-  userId?: string;
+  userId?: string; // ID пользователя, создавшего задание
 }
 
 // Схема для отклика на задание
@@ -63,15 +63,28 @@ export const responseSchema = z.object({
   taskId: z.string(),
   taskTitle: z.string(),
   taskCategory: z.enum(taskCategories),
-  taskOwnerId: z.string(), // ID пользователя, создавшего задание
-  responderId: z.string(), // ID пользователя, оставившего отклик
+  taskOwnerId: z.string(), 
+  responderId: z.string(), 
   responderName: z.string().nullable().optional(),
   responderPhotoURL: z.string().url().nullable().optional(),
-  // respondedAt будет добавляться как serverTimestamp()
 });
 
 export type ResponseData = z.infer<typeof responseSchema> & {
   id: string;
-  respondedAt: string; // Уже сконвертированная строка для отображения
-  firestoreRespondedAt?: Timestamp; // Оригинальный Timestamp из Firestore
+  respondedAt: string; 
+  firestoreRespondedAt?: Timestamp; 
+};
+
+// Схема для уведомлений
+export const notificationSchema = z.object({
+  taskId: z.string(),
+  taskTitle: z.string(),
+  message: z.string(),
+  // createdAt будет добавляться как serverTimestamp()
+});
+
+export type NotificationData = z.infer<typeof notificationSchema> & {
+  id: string;
+  createdAt: string; // Уже сконвертированная строка для отображения
+  firestoreCreatedAt?: Timestamp; // Оригинальный Timestamp из Firestore
 };

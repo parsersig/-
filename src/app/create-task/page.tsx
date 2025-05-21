@@ -56,7 +56,7 @@ export default function CreateTaskPage() {
 
   async function onSubmit(data: TaskFormValues) {
     setIsSubmitting(true);
-    if (!currentUser && auth) {
+    if (!auth || !currentUser) {
       toast({
         title: "Требуется вход",
         description: "Пожалуйста, войдите в систему, чтобы опубликовать задание.",
@@ -76,18 +76,32 @@ export default function CreateTaskPage() {
         return;
     }
 
-    const userId = auth ? currentUser?.uid : undefined;
-
     try {
       console.log("Attempting to save task to Firestore:", data);
       const docRef = await addDoc(collection(db, "tasks"), {
         ...data,
-        userId: userId || "anonymous", // Handle case where user might not be fully loaded
+        userId: currentUser.uid,
         postedDate: serverTimestamp(),
-        city: "Ирбит",
+        city: "Ирбит", // Пока оставляем город по умолчанию
         views: 0,
       });
       console.log("Task saved to Firestore with ID:", docRef.id);
+
+      // Создаем запись-уведомление
+      try {
+        await addDoc(collection(db, "notifications"), {
+          taskId: docRef.id,
+          taskTitle: data.title,
+          message: `Новое задание опубликовано: "${data.title}"`,
+          createdAt: serverTimestamp(),
+          read: false, // Опционально: для отслеживания прочитанных уведомлений
+          type: "new_task", // Опционально: для типизации уведомлений
+        });
+        console.log("Notification entry created for new task ID:", docRef.id);
+      } catch (notifError) {
+        console.error("Failed to create notification entry:", notifError);
+        // Не блокируем пользователя, если уведомление не создалось, но логируем
+      }
 
       toast({
         title: "Задание успешно опубликовано в облаке!",
@@ -97,7 +111,7 @@ export default function CreateTaskPage() {
             {currentUser && <p className="text-xs text-muted-foreground">Оно будет видно в разделе "Мои задания".</p>}
             <div className="flex gap-2 mt-2">
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/tasks/${docRef.id}`} className="flex items-center" legacyBehavior>
+                <Link href={`/tasks/${docRef.id}`} className="flex items-center">
                   <ExternalLink className="h-4 w-4 mr-1.5" />
                   Посмотреть задание
                 </Link>
@@ -263,16 +277,19 @@ export default function CreateTaskPage() {
                       <Input placeholder="Ваш телефон, Telegram или другой способ связи" {...field} className="h-12 text-base" />
                     </FormControl>
                     <FormDescription className="text-xs sm:text-sm">
-                      Как исполнители смогут с вами связаться. {currentUser && `(по умолчанию будет использоваться ваш email: ${currentUser.email})`}
+                      Как исполнители смогут с вами связаться. {currentUser && `(Можно использовать email: ${currentUser.email})`}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <Button type="submit" size="lg" className="w-full md:w-auto min-w-[180px] sm:min-w-[200px] text-md sm:text-lg h-12 sm:h-14 mt-6 sm:mt-8 shadow-lg hover-scale" disabled={isSubmitting}>
+              <Button type="submit" size="lg" className="w-full md:w-auto min-w-[180px] sm:min-w-[200px] text-md sm:text-lg h-12 sm:h-14 mt-6 sm:mt-8 shadow-lg hover-scale" disabled={isSubmitting || !currentUser}>
                 {isSubmitting ? "Публикация..." : "Опубликовать задание"}
               </Button>
+              {!currentUser && (
+                <p className="text-sm text-destructive text-center mt-2">Для публикации задания необходимо войти в систему.</p>
+              )}
             </form>
           </Form>
         </CardContent>
@@ -280,5 +297,3 @@ export default function CreateTaskPage() {
     </div>
   );
 }
-
-    

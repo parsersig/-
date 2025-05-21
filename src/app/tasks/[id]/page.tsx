@@ -1,3 +1,4 @@
+
 // src/app/tasks/[id]/page.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
@@ -7,37 +8,62 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ArrowLeft, Briefcase, CalendarDays, DollarSign, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle, Users } from "lucide-react";
 import type { StoredTask, ResponseData } from "@/lib/schemas";
 import { useToast } from "@/hooks/use-toast";
 import { db, auth } from "@/lib/firebase";
-import { doc, getDoc, updateDoc, increment, Timestamp, collection, addDoc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, updateDoc, increment, Timestamp, collection, addDoc, serverTimestamp, query, where, getDocs, orderBy } from "firebase/firestore";
 import type { User } from "firebase/auth";
 
 const formatDate = (date: any): string => {
   if (!date) return "Дата не указана";
-  if (date instanceof Timestamp) {
+  // Проверяем, является ли date объектом Timestamp из Firebase
+  if (date && typeof date.toDate === 'function') {
     return date.toDate().toLocaleDateString("ru-RU", { year: "numeric", month: "long", day: "numeric" });
   }
+  // Если это уже строка (например, из localStorage или после предыдущего форматирования)
   if (typeof date === "string") {
     const parsedDate = new Date(date);
     if (!isNaN(parsedDate.getTime())) {
       return parsedDate.toLocaleDateString("ru-RU", { year: "numeric", month: "long", day: "numeric" });
     }
   }
+  // Если это число (мс с эпохи)
+  if (typeof date === 'number') {
+    return new Date(date).toLocaleDateString("ru-RU", { year: "numeric", month: "long", day: "numeric" });
+  }
   return "Неверный формат даты";
 };
+
+const formatResponseDate = (date: any): string => {
+  if (!date) return 'неизвестно';
+  if (date && typeof date.toDate === 'function') {
+    return date.toDate().toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  if (typeof date === "string") {
+    const parsedDate = new Date(date);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+  }
+  return 'неверный формат';
+};
+
 
 export default function TaskDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
   const taskId = params.id as string;
-  const [task, setTask] = useState<StoredTask | null | undefined>(undefined);
+  const [task, setTask] = useState<StoredTask | null | undefined>(undefined); // undefined - загрузка, null - не найдено
   const [isLoading, setIsLoading] = useState(true);
   const [isResponding, setIsResponding] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [hasResponded, setHasResponded] = useState(false);
+
+  const [taskResponses, setTaskResponses] = useState<ResponseData[]>([]);
+  const [isLoadingResponses, setIsLoadingResponses] = useState(false);
 
   useEffect(() => {
     if (auth) {
@@ -62,26 +88,25 @@ export default function TaskDetailPage() {
         });
         sessionStorage.setItem(viewedTasksKey, "true");
         console.log("View count incremented for task:", currentTaskId);
+        // Обновляем состояние локально, чтобы не перезапрашивать все задание
         setTask((prev) => (prev ? { ...prev, views: (prev.views || 0) + 1 } : null));
       } catch (error) {
         console.error("Error incrementing view count:", error);
       }
-    } else {
-      console.log("Task already viewed in this session:", currentTaskId);
     }
   }, []);
 
+  // Fetch task details
   useEffect(() => {
     if (taskId && db) {
       setIsLoading(true);
       const fetchTask = async () => {
         try {
-          console.log(`Fetching task with ID: ${taskId}`);
-          const taskRef = doc(db!, "tasks", taskId);
+          const taskRef = doc(db, "tasks", taskId);
           const taskSnap = await getDoc(taskRef);
 
           if (taskSnap.exists()) {
-            const taskData = taskSnap.data();
+            const taskData = taskSnap.data() as Omit<StoredTask, 'id' | 'postedDate'> & { postedDate: Timestamp };
             const fetchedTask = {
               id: taskSnap.id,
               ...taskData,
@@ -90,7 +115,6 @@ export default function TaskDetailPage() {
             setTask(fetchedTask);
             await incrementViewCount(taskId);
           } else {
-            console.log("No such document!");
             setTask(null);
           }
         } catch (error) {
@@ -110,25 +134,59 @@ export default function TaskDetailPage() {
       console.warn("Firestore (db) is not initialized. Cannot fetch task.");
       setIsLoading(false);
       setTask(null);
-      toast({
-        title: "Ошибка конфигурации",
-        description: "База данных не доступна. Проверьте настройки Firebase.",
-        variant: "destructive",
-      });
     }
   }, [taskId, incrementViewCount, toast]);
 
+  // Fetch responses if current user is the task owner OR check if current user has responded
   useEffect(() => {
-    if (currentUser && task && db) {
-      const checkResponseStatus = async () => {
-        const responsesRef = collection(db!, "responses");
-        const q = query(responsesRef, where("taskId", "==", task.id), where("responderId", "==", currentUser.uid));
-        const querySnapshot = await getDocs(q);
-        setHasResponded(!querySnapshot.empty);
-      };
-      checkResponseStatus();
+    if (!task || !db || !currentUser) { // Добавил !currentUser, чтобы не запускать без пользователя
+        if (task === null) setIsLoadingResponses(false); // Если задание не найдено, отклики тоже не грузим
+        return;
     }
-  }, [currentUser, task, db]);
+
+    // Check if current user has already responded to this task
+    const checkResponseStatus = async () => {
+      const responsesRef = collection(db, "responses");
+      const q = query(responsesRef, where("taskId", "==", task.id), where("responderId", "==", currentUser.uid));
+      const querySnapshot = await getDocs(q);
+      setHasResponded(!querySnapshot.empty);
+    };
+    checkResponseStatus();
+
+
+    // If current user is the task owner, fetch all responses for this task
+    if (task.userId === currentUser.uid) {
+      setIsLoadingResponses(true);
+      const responsesQuery = query(
+        collection(db, "responses"),
+        where("taskId", "==", task.id),
+        orderBy("respondedAt", "desc")
+      );
+      const unsubscribeResponses = onSnapshot(responsesQuery, (snapshot) => {
+        const responses: ResponseData[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          responses.push({
+            id: docSnap.id,
+            ...data,
+            respondedAt: formatResponseDate(data.respondedAt),
+            firestoreRespondedAt: data.respondedAt,
+          } as ResponseData);
+        });
+        setTaskResponses(responses);
+        setIsLoadingResponses(false);
+      }, (error) => {
+        console.error("Error fetching task responses:", error);
+        toast({ title: "Ошибка", description: "Не удалось загрузить отклики на задание.", variant: "destructive" });
+        setIsLoadingResponses(false);
+      });
+      return () => unsubscribeResponses();
+    } else {
+        // If not owner, no need to load all responses, just ensure loading state is false
+        setIsLoadingResponses(false);
+    }
+  }, [task, currentUser, db, toast]);
+
 
   const handleRespond = async () => {
     if (!task || !db) return;
@@ -145,7 +203,7 @@ export default function TaskDetailPage() {
       toast({
         title: "Невозможно откликнуться",
         description: "Вы не можете откликнуться на собственное задание.",
-        variant: "destructive",
+        variant: "destructive", // или "default"
       });
       return;
     }
@@ -162,20 +220,18 @@ export default function TaskDetailPage() {
     setIsResponding(true);
     try {
       console.log("Attempting to save response to Firestore. Task:", task, "User:", currentUser);
-      const responseData: Omit<ResponseData, "id" | "respondedAt" | "firestoreRespondedAt"> = {
+      const responseData = {
         taskId: task.id,
         taskTitle: task.title,
-        taskCategory: task.category,
-        taskOwnerId: task.userId || "unknown_owner",
+        taskCategory: task.category, // Добавлено
+        taskOwnerId: task.userId || "unknown_owner", // Добавлено
         responderId: currentUser.uid,
         responderName: currentUser.displayName || "Анонимный исполнитель",
         responderPhotoURL: currentUser.photoURL || null,
+        respondedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db!, "responses"), {
-        ...responseData,
-        respondedAt: serverTimestamp(),
-      });
+      await addDoc(collection(db, "responses"), responseData);
 
       toast({
         title: "Отлично!",
@@ -183,7 +239,7 @@ export default function TaskDetailPage() {
         variant: "default",
         duration: 7000,
       });
-      setHasResponded(true);
+      setHasResponded(true); // Устанавливаем, что пользователь откликнулся
     } catch (error) {
       console.error("Failed to save response to Firestore", error);
       toast({
@@ -225,9 +281,11 @@ export default function TaskDetailPage() {
     );
   }
 
-  if (!task) {
-    return null;
+  if (!task) { // Дополнительная проверка на случай, если task еще undefined
+    return null; // или другой индикатор загрузки/ошибки
   }
+  
+  const isOwner = currentUser?.uid === task.userId;
 
   return (
     <div className="max-w-3xl mx-auto px-2 sm:px-0">
@@ -292,31 +350,76 @@ export default function TaskDetailPage() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="pt-5 sm:pt-6 px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-          <p className="text-sm text-muted-foreground text-center sm:text-left">Готовы взяться за это задание или есть вопросы?</p>
-          <Button
-            size="lg"
-            className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale"
-            onClick={handleRespond}
-            disabled={!currentUser || isResponding || task.userId === currentUser?.uid || hasResponded}
-          >
-            {isResponding ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            ) : (
-              <MessageSquare className="mr-2 h-5 w-5" />
-            )}
-            {currentUser
-              ? task.userId === currentUser.uid
-                ? "Это ваше задание"
-                : hasResponded
-                ? "Вы уже откликнулись"
-                : isResponding
-                ? "Отправка..."
-                : "Откликнуться"
-              : "Войдите, чтобы откликнуться"}
-          </Button>
-        </CardFooter>
+        {!isOwner && (
+          <CardFooter className="pt-5 sm:pt-6 px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+            <p className="text-sm text-muted-foreground text-center sm:text-left">Готовы взяться за это задание или есть вопросы?</p>
+            <Button
+              size="lg"
+              className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale"
+              onClick={handleRespond}
+              disabled={!currentUser || isResponding || hasResponded}
+            >
+              {isResponding ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <MessageSquare className="mr-2 h-5 w-5" />
+              )}
+              {currentUser
+                ? hasResponded
+                  ? "Вы уже откликнулись"
+                  : isResponding
+                  ? "Отправка..."
+                  : "Откликнуться"
+                : "Войдите, чтобы откликнуться"}
+            </Button>
+          </CardFooter>
+        )}
       </Card>
+
+      {isOwner && (
+        <Card className="mt-6 shadow-xl bg-card/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center text-xl sm:text-2xl">
+              <Users className="h-6 w-6 mr-3 text-accent" />
+              Отклики на ваше задание
+            </CardTitle>
+            <CardDescription>Список исполнителей, которые откликнулись.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingResponses && (
+              <div className="flex justify-center items-center py-6">
+                <Loader2 className="h-8 w-8 text-accent animate-spin mr-2" />
+                <p className="text-muted-foreground">Загрузка откликов...</p>
+              </div>
+            )}
+            {!isLoadingResponses && taskResponses.length === 0 && (
+              <p className="text-muted-foreground py-4 text-center">На это задание пока нет откликов.</p>
+            )}
+            {!isLoadingResponses && taskResponses.length > 0 && (
+              <ul className="space-y-4">
+                {taskResponses.map((response) => (
+                  <li key={response.id} className="p-4 border rounded-lg bg-muted/30 shadow-sm">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={response.responderPhotoURL || undefined} alt={response.responderName || "User"} data-ai-hint="user avatar" />
+                        <AvatarFallback>
+                          {response.responderName ? response.responderName.substring(0, 1).toUpperCase() : <UserCircle />}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold text-foreground">{response.responderName || "Анонимный исполнитель"}</p>
+                        <p className="text-xs text-muted-foreground">Откликнулся: {response.respondedAt}</p>
+                      </div>
+                    </div>
+                    {/* TODO: Можно добавить кнопку "Связаться" или "Принять отклик" */}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
+
