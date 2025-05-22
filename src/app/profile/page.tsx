@@ -233,18 +233,21 @@ export default function ProfilePage() {
             <CardTitle className="text-3xl sm:text-4xl font-bold mb-1">{displayName}</CardTitle>
             <CardDescription className="text-lg text-muted-foreground mb-3">{userProfile?.city || "Ирбит"} • {userProfile?.age ? `${userProfile.age} лет` : "Возраст не указан"}</CardDescription> 
             <div className="flex flex-wrap gap-2 justify-center md:justify-start mb-4">
-              <Badge variant="secondary" className="text-sm py-1 px-3 bg-green-600/20 text-green-400 border-green-500/40">Исполнитель</Badge>
               <Badge variant="secondary" className="text-sm py-1 px-3 bg-blue-600/20 text-blue-400 border-blue-500/40">Проверен</Badge>
             </div>
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="lg" className="w-full sm:w-auto hover-scale">
-                    <Edit className="h-5 w-5 mr-2" /> Редактировать профиль
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl">Редактирование профиля</DialogTitle>
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <Button size="lg" className="w-full sm:w-auto hover-scale">
+                <Mail className="h-5 w-5 mr-2" /> Написать сообщение
+              </Button>
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="lg" className="w-full sm:w-auto hover-scale">
+                      <Edit className="h-5 w-5 mr-2" /> Редактировать профиль
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl">Редактирование профиля</DialogTitle>
                     <DialogDescription>
                       Обновите информацию о себе и своих специализациях.
                     </DialogDescription>
@@ -261,6 +264,7 @@ export default function ProfilePage() {
                   </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </CardContent>
       </Card>
