@@ -465,7 +465,6 @@ export default function TaskDetailPage() {
                   <Loader2 className="h-5 w-5 animate-spin text-accent" />
                 ) : taskOwner ? (
                   <>
-                  <>
                     <Link href={`/profile/${taskOwner.uid}`} className="flex items-center space-x-3 group mr-auto">
                       <Avatar className="h-10 w-10 group-hover:ring-2 group-hover:ring-accent/70 transition-all duration-150 ease-in-out">
                         <AvatarImage src={taskOwner.photoURL || undefined} alt={taskOwner.displayName || "Заказчик"} />

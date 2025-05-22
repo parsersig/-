@@ -80,7 +80,6 @@ export default function UserProfilePage() {
 
       if (profileSnap.exists()) {
         const profileData = profileSnap.data() as Omit<UserProfile, 'uid'>;
-        // Ensure Timestamp fields are correctly handled if they are stored as Firestore Timestamps
         const registrationDate = profileData.registrationDate instanceof Timestamp 
             ? profileData.registrationDate 
             : profileData.registrationDate ? Timestamp.fromDate(new Date(profileData.registrationDate as any)) : undefined;
@@ -128,54 +127,8 @@ export default function UserProfilePage() {
     }
   }, [profileUserId, fetchUserProfileAndData]);
 
-  const handleInitiateChat = async () => {
-    if (!db || !currentUser) {
-        toast({ title: "Требуется вход", description: "Пожалуйста, войдите, чтобы написать сообщение.", variant: "destructive" });
-        return;
-    }
-    if (!userProfile) {
-        toast({ title: "Ошибка", description: "Профиль пользователя не загружен.", variant: "destructive" });
-        return;
-    }
-    if (currentUser.uid === userProfile.uid) {
-        toast({ title: "Это вы!", description: "Вы не можете начать чат с самим собой.", variant: "default" });
-        return;
-    }
-
-    setIsInitiatingChat(true);
-    const firestore = db as Firestore;
-    const participantsArray = [currentUser.uid, userProfile.uid].sort();
-    const generatedChatId = participantsArray.join('_');
-
-    try {
-        const chatRef = doc(firestore, "chats", generatedChatId);
-        const chatSnap = await getDoc(chatRef);
-
-        if (!chatSnap.exists()) {
-            const newChatData: Partial<ChatData> = {
-                participants: participantsArray,
-                participantNames: {
-                    [currentUser.uid]: currentUser.displayName || "Текущий Пользователь",
-                    [userProfile.uid]: userProfile.displayName || "Пользователь",
-                },
-                participantPhotoURLs: {
-                    [currentUser.uid]: currentUser.photoURL || null,
-                    [userProfile.uid]: userProfile.photoURL || null,
-                },
-                // taskId and taskTitle can be omitted or set to null for profile-initiated chats
-                lastMessageText: "",
-                lastMessageAt: null,
-                createdAt: serverTimestamp() as Timestamp,
-            };
-            await setDoc(chatRef, newChatData);
-        }
-        router.push(`/messages?chatId=${generatedChatId}`);
-    } catch (error: any) {
-        console.error("Error initiating chat:", error);
-        toast({ title: "Ошибка чата", description: `Не удалось начать чат: ${error.message}`, variant: "destructive" });
-    // This local handleInitiateChat function will be removed.
-    // Calls will be made directly to the imported initiateChat utility.
-  };
+  // The local handleInitiateChat function was removed in a previous step.
+  // The onClick handler for "Написать сообщение" button directly calls the imported `initiateChat` utility.
 
   if (isLoadingAuth || isLoadingProfile) {
     return (
@@ -201,7 +154,7 @@ export default function UserProfilePage() {
     );
   }
   
-  if (!userProfile) { // Should be caught by profileError, but as a fallback
+  if (!userProfile) { 
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-200px)] text-center p-4">
         <AlertCircle className="mx-auto h-12 w-12 sm:h-16 sm:w-16 text-destructive mb-4" />
@@ -234,7 +187,6 @@ export default function UserProfilePage() {
             <CardTitle className="text-3xl sm:text-4xl font-bold mb-1">{displayName}</CardTitle>
             <CardDescription className="text-lg text-muted-foreground mb-3">{userProfile.city || "Город не указан"} • {userProfile.age ? `${userProfile.age} лет` : "Возраст не указан"}</CardDescription> 
             <div className="flex flex-wrap gap-2 justify-center md:justify-start mb-4">
-              {/* Можно добавить другие значки, если есть информация, например, о верификации */}
               <Badge variant="secondary" className="text-sm py-1 px-3 bg-blue-600/20 text-blue-400 border-blue-500/40">Проверен (демо)</Badge>
             </div>
             {currentUser && currentUser.uid !== userProfile.uid && (
@@ -253,7 +205,6 @@ export default function UserProfilePage() {
                         firestore: db as Firestore,
                         router,
                         toast,
-                        // taskInfo is omitted here as this is a general profile chat
                     });
                     setIsInitiatingChat(false);
                   }}
@@ -274,7 +225,6 @@ export default function UserProfilePage() {
       </Card>
 
       <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
-        {/* Левая колонка: О себе, Специализации */}
         <div className="md:col-span-2 space-y-6 sm:space-y-8">
           <Card className="shadow-lg bg-card/70 backdrop-blur-sm">
             <CardHeader>
@@ -305,7 +255,6 @@ export default function UserProfilePage() {
           </Card>
         </div>
 
-        {/* Правая колонка: Статистика, Активность */}
         <div className="md:col-span-1 space-y-6 sm:space-y-8">
           <Card className="shadow-lg bg-card/70 backdrop-blur-sm">
             <CardHeader>
@@ -328,13 +277,11 @@ export default function UserProfilePage() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <p className="flex items-center text-muted-foreground"><CalendarDays className="h-4 w-4 mr-2 text-accent/80" />Регистрация: <span className="ml-1 font-medium text-foreground/90">{registrationDateDisplay}</span></p>
-              {/* Email и Последний визит могут быть скрыты для публичного просмотра или показываться только владельцу */}
             </CardContent>
           </Card>
         </div>
       </div>
       
-      {/* Секция Отзывы */}
       <Card className="shadow-xl bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="text-xl flex items-center"><Star className="h-6 w-6 mr-2.5 text-accent"/>Рейтинг и Отзывы ({reviewsCount})</CardTitle>
