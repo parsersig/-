@@ -20,6 +20,7 @@ import {
 } from "firebase/firestore";
 import type { User as FirebaseUser } from "firebase/auth";
 import { initiateChat } from "@/lib/chatUtils"; // Added import
+import RespondModal from "@/components/tasks/RespondModal"; // Import RespondModal
 
 const formatDate = (date: any): string => {
   if (!date) return "Дата не указана";
@@ -84,6 +85,7 @@ export default function TaskDetailPage() {
   const [taskResponses, setTaskResponses] = useState<ResponseData[]>([]);
   const [isLoadingResponses, setIsLoadingResponses] = useState(false);
   const [isInitiatingChat, setIsInitiatingChat] = useState(false);
+  const [isRespondModalOpen, setIsRespondModalOpen] = useState(false); // State for modal
 
 
   useEffect(() => {
@@ -259,29 +261,35 @@ export default function TaskDetailPage() {
     });
   }, [task, currentUser, toast]);
 
-  const handleRespond = async () => {
+  const handleSubmitResponse = async (message: string) => {
     if (!db || !task) {
       toast({ title: "Ошибка", description: "Данные задания или база данных недоступны.", variant: "destructive"});
+      // setIsResponding(false); // Ensure loader stops if early exit
       return;
     }
     if (!currentUser) {
       toast({ title: "Требуется вход", description: "Пожалуйста, войдите, чтобы откликнуться.", variant: "destructive" });
+      // setIsResponding(false);
       return;
     }
     if (task.userId === currentUser.uid) {
       toast({ title: "Это ваше задание", description: "Вы не можете откликнуться на собственное задание.", variant: "default" });
+      // setIsResponding(false);
       return;
     }
-    if (hasResponded && !isExecutor) {
+    // This check is also present in button's disabled state, but good for robustness
+    if (hasResponded && !isExecutor) { 
       toast({ title: "Вы уже откликались", description: "Вы уже отправляли отклик на это задание.", variant: "default" });
+      // setIsResponding(false);
       return;
     }
      if (task.status !== 'open') {
       toast({ title: "Задание неактивно", description: "Это задание уже не принимает отклики.", variant: "default" });
+      // setIsResponding(false);
       return;
     }
 
-    setIsResponding(true);
+    setIsResponding(true); // Indicates submission is in progress
     try {
       const firestore = db as Firestore;
       const responseData = {
@@ -292,18 +300,21 @@ export default function TaskDetailPage() {
         responderId: currentUser.uid,
         responderName: currentUser.displayName || "Анонимный исполнитель",
         responderPhotoURL: currentUser.photoURL || null,
+        message: message, // Include the message from the modal
         respondedAt: serverTimestamp(),
       };
       await addDoc(collection(firestore, "responses"), responseData);
       toast({ 
         title: "Отлично!", 
-        description: `Ваш отклик на задание «${task.title}» успешно отправлен и сохранен в базе данных!`, 
+        description: `Ваш отклик на задание «${task.title}» успешно отправлен!`, 
         duration: 7000 
       });
       setHasResponded(true);
+      setIsRespondModalOpen(false); // Close modal on success
     } catch (error: any) {
       console.error("Failed to save response to Firestore", error);
       toast({ title: "Ошибка сохранения отклика", description: `Не удалось сохранить ваш отклик. ${error.message || "Пожалуйста, попробуйте еще раз."}`, variant: "destructive" });
+      // Modal remains open for user to try again or cancel
     } finally {
       setIsResponding(false);
     }
@@ -541,11 +552,11 @@ export default function TaskDetailPage() {
             <Button 
               size="lg" 
               className="w-full sm:w-auto min-w-[200px] sm:min-w-[250px] text-md sm:text-lg h-12 sm:h-14 shadow-lg hover-scale" 
-              onClick={handleRespond} 
-              disabled={isResponding}
+              onClick={() => setIsRespondModalOpen(true)} 
+              disabled={isResponding || hasResponded || task.status !== 'open'}
             >
-              {isResponding ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <MessageSquare className="mr-2 h-5 w-5" />}
-              Откликнуться на задание
+              {hasResponded ? <Check className="mr-2 h-5 w-5 text-green-400" /> : <MessageSquare className="mr-2 h-5 w-5" />}
+              {hasResponded ? "Вы уже откликнулись" : "Откликнуться на задание"}
             </Button>
           )}
            {!isOwner && task.status === 'open' && !currentUser && (
@@ -581,6 +592,16 @@ export default function TaskDetailPage() {
           )}
         </CardFooter>
       </Card>
+
+      {task && (
+        <RespondModal
+          isOpen={isRespondModalOpen}
+          onClose={() => setIsRespondModalOpen(false)}
+          onSubmitResponse={handleSubmitResponse}
+          taskTitle={task.title}
+          isSubmitting={isResponding}
+        />
+      )}
 
       {isOwner && (
         <Card className="mt-6 shadow-xl bg-card/80 backdrop-blur-sm">
@@ -630,7 +651,11 @@ export default function TaskDetailPage() {
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">Откликнулся: {response.respondedAt}</p>
-                        {response.message && <p className="text-sm mt-1 italic whitespace-pre-line break-words">"{response.message}"</p>}
+                        {response.message && (
+                          <p className="text-sm mt-2 italic whitespace-pre-line break-words bg-background/50 p-3 rounded-md shadow-sm border border-border/50">
+                            "{response.message}"
+                          </p>
+                        )}
                       </div>
                        {currentUser && response.responderId && (
                          <Button 
