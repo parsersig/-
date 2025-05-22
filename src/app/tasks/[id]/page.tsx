@@ -19,6 +19,7 @@ import {
   type QuerySnapshot, type QueryDocumentSnapshot, type FirestoreError, type Firestore
 } from "firebase/firestore";
 import type { User as FirebaseUser } from "firebase/auth";
+import { initiateChat } from "@/lib/chatUtils"; // Added import
 
 const formatDate = (date: any): string => {
   if (!date) return "Дата не указана";
@@ -388,10 +389,13 @@ export default function TaskDetailPage() {
         console.error("Error initiating chat:", error);
         toast({ title: "Ошибка чата", description: `Не удалось начать чат: ${error.message}`, variant: "destructive" });
     } finally {
-        setIsInitiatingChat(false);
+        // This state update will be handled in the calling component after awaiting initiateChat
+        // setIsInitiatingChat(false); 
     }
-};
+  };
 
+  // This local handleInitiateChat function will be removed.
+  // Calls will be made directly to the imported initiateChat utility.
 
   if (isLoading) {
     return (
@@ -461,24 +465,40 @@ export default function TaskDetailPage() {
                   <Loader2 className="h-5 w-5 animate-spin text-accent" />
                 ) : taskOwner ? (
                   <>
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={taskOwner.photoURL || undefined} alt={taskOwner.displayName || "Заказчик"} />
-                      <AvatarFallback>{taskOwner.displayName ? taskOwner.displayName.charAt(0).toUpperCase() : <User />}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-foreground">{taskOwner.displayName || "Заказчик"}</p>
-                       <div className="flex items-center space-x-2 text-xs mt-0.5" title="Отзывы о заказчике (демо)">
-                        <ThumbsUp className="h-3.5 w-3.5 text-green-500"/> <span className="text-green-400">15</span>
-                        <ThumbsDown className="h-3.5 w-3.5 text-red-500"/> <span className="text-red-400">2</span>
+                    <Link href={`/profile/${taskOwner.uid}`} className="flex items-center space-x-3 group mr-auto">
+                      <Avatar className="h-10 w-10 group-hover:ring-2 group-hover:ring-accent/70 transition-all duration-150 ease-in-out">
+                        <AvatarImage src={taskOwner.photoURL || undefined} alt={taskOwner.displayName || "Заказчик"} />
+                        <AvatarFallback>{taskOwner.displayName ? taskOwner.displayName.charAt(0).toUpperCase() : <User />}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium text-foreground group-hover:text-accent transition-colors duration-150 ease-in-out">{taskOwner.displayName || "Заказчик"}</p>
+                         <div className="flex items-center space-x-2 text-xs mt-0.5" title="Отзывы о заказчике (демо)">
+                          <ThumbsUp className="h-3.5 w-3.5 text-green-500"/> <span className="text-green-400">15</span>
+                          <ThumbsDown className="h-3.5 w-3.5 text-red-500"/> <span className="text-red-400">2</span>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                     {!isOwner && currentUser && taskOwner && (
                         <Button 
                             variant="outline" 
                             size="sm" 
-                            onClick={() => handleInitiateChat(taskOwner.uid, taskOwner.displayName || null, taskOwner.photoURL || null)}
+                            onClick={async () => {
+                              if (!currentUser || !taskOwner || !db) return;
+                              setIsInitiatingChat(true);
+                              await initiateChat({
+                                currentUser,
+                                otherUserId: taskOwner.uid,
+                                otherUserName: taskOwner.displayName || null,
+                                otherUserPhotoURL: taskOwner.photoURL || null,
+                                firestore: db as Firestore,
+                                router,
+                                toast,
+                                taskInfo: { taskId: task.id, taskTitle: task.title }
+                              });
+                              setIsInitiatingChat(false);
+                            }}
                             disabled={isInitiatingChat}
-                            className="ml-auto text-xs"
+                            className="text-xs flex-shrink-0" // Ensure button does not cause overflow
                         >
                             {isInitiatingChat ? <Loader2 className="h-4 w-4 animate-spin mr-1.5"/> : <MessageSquare className="h-4 w-4 mr-1.5"/>}
                             Написать автору
@@ -579,28 +599,64 @@ export default function TaskDetailPage() {
               <ul className="space-y-4">
                 {taskResponses.map((response) => (
                   <li key={response.id} className="p-4 border rounded-lg bg-muted/30 shadow-sm hover-lift-sm transition-all">
-                    <div className="flex items-start space-x-4 mb-3">
-                      <Avatar className="h-11 w-11 border">
-                        <AvatarImage src={response.responderPhotoURL || undefined} alt={response.responderName || "User"} data-ai-hint="user avatar small" />
-                        <AvatarFallback className="text-lg">
-                            {response.responderName ? response.responderName.substring(0, 1).toUpperCase() : <UserCircle size={24}/>}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-semibold text-foreground">{response.responderName || "Анонимный исполнитель"}</p>
+                    <div className="flex items-start space-x-4">
+                      {response.responderId ? (
+                        <Link href={`/profile/${response.responderId}`} className="group flex-shrink-0">
+                          <Avatar className="h-11 w-11 border group-hover:ring-2 group-hover:ring-accent/70 transition-all duration-150 ease-in-out">
+                            <AvatarImage src={response.responderPhotoURL || undefined} alt={response.responderName || "User"} />
+                            <AvatarFallback className="text-lg">
+                                {response.responderName ? response.responderName.substring(0, 1).toUpperCase() : <UserCircle size={24}/>}
+                            </AvatarFallback>
+                          </Avatar>
+                        </Link>
+                      ) : (
+                        <Avatar className="h-11 w-11 border">
+                          <AvatarImage src={response.responderPhotoURL || undefined} alt={response.responderName || "User"} />
+                          <AvatarFallback className="text-lg">
+                              {response.responderName ? response.responderName.substring(0, 1).toUpperCase() : <UserCircle size={24}/>}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div className="flex-1 min-w-0"> {/* Added min-w-0 for better truncation */}
+                        {response.responderId ? (
+                          <Link href={`/profile/${response.responderId}`} className="group">
+                            <p className="font-semibold text-foreground group-hover:text-accent transition-colors duration-150 ease-in-out truncate" title={response.responderName || "Анонимный исполнитель"}>
+                              {response.responderName || "Анонимный исполнитель"}
+                            </p>
+                          </Link>
+                        ) : (
+                          <p className="font-semibold text-foreground truncate" title={response.responderName || "Анонимный исполнитель"}>
+                            {response.responderName || "Анонимный исполнитель"}
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground">Откликнулся: {response.respondedAt}</p>
-                        {response.message && <p className="text-sm mt-1 italic">"{response.message}"</p>}
+                        {response.message && <p className="text-sm mt-1 italic whitespace-pre-line break-words">"{response.message}"</p>}
                       </div>
                        {currentUser && response.responderId && (
                          <Button 
                             variant="outline" 
                             size="sm" 
-                            onClick={() => handleInitiateChat(response.responderId, response.responderName || null, response.responderPhotoURL || null)}
+                            onClick={async () => {
+                              if (!currentUser || !response.responderId || !db) return;
+                              setIsInitiatingChat(true);
+                              await initiateChat({
+                                currentUser,
+                                otherUserId: response.responderId,
+                                otherUserName: response.responderName || null,
+                                otherUserPhotoURL: response.responderPhotoURL || null,
+                                firestore: db as Firestore,
+                                router,
+                                toast,
+                                taskInfo: { taskId: task.id, taskTitle: task.title }
+                              });
+                              setIsInitiatingChat(false);
+                            }}
                             disabled={isInitiatingChat}
-                            className="ml-auto text-xs"
+                            className="ml-auto text-xs flex-shrink-0" // Added flex-shrink-0
+                            title={`Написать ${response.responderName || 'исполнителю'}`}
                           >
-                            {isInitiatingChat ? <Loader2 className="h-4 w-4 animate-spin mr-1.5"/> : <MessageSquare className="h-4 w-4 mr-1.5"/>}
-                            Написать
+                            {isInitiatingChat ? <Loader2 className="h-4 w-4 animate-spin"/> : <MessageSquare className="h-4 w-4"/>}
+                            <span className="hidden sm:inline ml-1.5">Написать</span>
                           </Button>
                        )}
                     </div>
