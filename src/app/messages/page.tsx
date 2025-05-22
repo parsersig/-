@@ -2,7 +2,7 @@
 // src/app/messages/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, FormEvent, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,7 @@ export default function MessagesPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [newMessageText, setNewMessageText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!auth) {
@@ -128,9 +129,92 @@ export default function MessagesPage() {
     } else {
       setSelectedChatPartner(null);
     }
-    // Загрузка сообщений для этого чата будет реализована в следующем useEffect
+    // Загрузка сообщений для этого чата
   }, [currentUser]);
 
+  // Effect to fetch messages for the selected chat
+  useEffect(() => {
+    if (!selectedChatId || !db) {
+      setCurrentMessages([]);
+      setIsLoadingMessages(false);
+      return;
+    }
+
+    setIsLoadingMessages(true);
+    const firestore = db as Firestore;
+    const messagesCollectionRef = collection(firestore, "chats", selectedChatId, "messages");
+    const q = query(messagesCollectionRef, orderBy("sentAt", "asc"));
+
+    const unsubscribeMessages = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
+      const fetchedMessages: MessageData[] = [];
+      snapshot.forEach((docSnap: QueryDocumentSnapshot<DocumentData>) => {
+        const data = docSnap.data();
+        fetchedMessages.push({
+          id: docSnap.id,
+          senderId: data.senderId,
+          text: data.text,
+          sentAt: data.sentAt as Timestamp,
+          type: data.type || 'text', // Assuming default type is 'text'
+        });
+      });
+      setCurrentMessages(fetchedMessages);
+      setIsLoadingMessages(false);
+    }, (error) => {
+      console.error("Error fetching messages:", error);
+      setIsLoadingMessages(false);
+      // Optionally, set an error state to display to the user
+    });
+
+    return () => unsubscribeMessages();
+  }, [selectedChatId]);
+
+  // Effect for auto-scrolling
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [currentMessages]);
+
+  const handleSendMessage = async (event: FormEvent) => {
+    event.preventDefault();
+    const trimmedText = newMessageText.trim();
+
+    if (!trimmedText) {
+      return;
+    }
+
+    if (!currentUser || !selectedChatId || !db) {
+      console.error("Cannot send message: User, selected chat, or DB is not available.");
+      return;
+    }
+
+    setIsSendingMessage(true);
+    try {
+      const firestore = db as Firestore;
+      // Add message to subcollection
+      const messagesCollectionRef = collection(firestore, "chats", selectedChatId, "messages");
+      await addDoc(messagesCollectionRef, {
+        senderId: currentUser.uid,
+        text: trimmedText,
+        sentAt: serverTimestamp(),
+        type: 'text',
+      });
+
+      // Update parent chat document
+      const chatDocRef = doc(firestore, "chats", selectedChatId);
+      await updateDoc(chatDocRef, {
+        lastMessageText: trimmedText,
+        lastMessageAt: serverTimestamp(),
+      });
+
+      setNewMessageText('');
+    } catch (error) {
+      console.error("Error sending message:", error);
+      // Here you could add a toast notification to the user
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
 
   if (isLoadingAuth) {
     return (
@@ -244,32 +328,51 @@ export default function MessagesPage() {
                     {/* <CardDescription className="text-xs text-green-500">Онлайн</CardDescription> */}
                 </div>
               </CardHeader>
-              <ScrollArea className="flex-grow p-4 space-y-4 bg-background/10">
-                {/* Здесь будут сообщения */}
-                {isLoadingMessages && <p className="text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin inline mr-2"/>Загрузка сообщений...</p>}
-                {!isLoadingMessages && currentMessages.length === 0 && <p className="text-center text-sm text-muted-foreground py-4">Сообщений пока нет. Начните диалог!</p>}
-                
-                {/* Пример отображения сообщений (заглушка) */}
-                {/* {currentMessages.map(msg => (
-                  <div key={msg.id} className={cn("flex mb-3", msg.senderId === currentUser.uid ? "justify-end" : "justify-start")}>
-                    <div className={cn("max-w-[70%] p-2.5 rounded-lg shadow", 
-                                      msg.senderId === currentUser.uid ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card text-card-foreground rounded-bl-none")}>
-                      <p className="text-sm">{msg.text}</p>
-                      <p className="text-xs mt-1 text-right opacity-70">{formatMessageTimestamp(msg.sentAt)}</p>
+              <ScrollArea className="flex-grow bg-background/10">
+                <div className="p-4 space-y-4">
+                  {isLoadingMessages && (
+                    <div className="flex justify-center items-center py-4">
+                      <Loader2 className="h-6 w-6 text-muted-foreground animate-spin mr-2"/>
+                      <p className="text-muted-foreground">Загрузка сообщений...</p>
                     </div>
-                  </div>
-                ))} */}
-                <div className="p-4 text-center text-muted-foreground border border-dashed rounded-md">
-                    <p>Отображение сообщений в разработке.</p>
-                    <p className="text-xs mt-1">Здесь будут сообщения для чата ID: {selectedChatId}</p>
+                  )}
+                  {!isLoadingMessages && currentMessages.length === 0 && (
+                    <p className="text-center text-sm text-muted-foreground py-10">
+                      Сообщений пока нет. Начните диалог!
+                    </p>
+                  )}
+                  {!isLoadingMessages && currentMessages.map(msg => (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        "flex w-full",
+                        msg.senderId === currentUser?.uid ? "justify-end" : "justify-start"
+                      )}
+                    >
+                      <div className={cn(
+                        "max-w-[70%] p-3 rounded-lg shadow-sm", // Increased padding
+                        msg.senderId === currentUser?.uid
+                          ? "bg-primary text-primary-foreground rounded-br-none"
+                          : "bg-card text-card-foreground rounded-bl-none"
+                      )}>
+                        <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                        <p className={cn(
+                          "text-xs mt-1 opacity-70", // Adjusted opacity for subtlety
+                          msg.senderId === currentUser?.uid ? "text-right" : "text-left"
+                        )}>
+                          {formatMessageTimestamp(msg.sentAt)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
                 </div>
-
               </ScrollArea>
               <CardFooter className="p-3 border-t bg-muted/20">
-                <form className="flex w-full items-center space-x-2" onSubmit={(e) => { e.preventDefault(); /* handleSendMessage() */ }}>
-                  <Input 
-                    type="text" 
-                    placeholder="Напишите сообщение..." 
+                <form className="flex w-full items-center space-x-2" onSubmit={handleSendMessage}>
+                  <Input
+                    type="text"
+                    placeholder="Напишите сообщение..."
                     className="flex-grow h-10 text-sm"
                     value={newMessageText}
                     onChange={(e) => setNewMessageText(e.target.value)}
