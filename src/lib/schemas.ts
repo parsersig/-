@@ -165,6 +165,7 @@ export const messageSchema = z.object({
   senderId: z.string().describe("ID пользователя, отправившего сообщение"),
   text: z.string().min(1, "Сообщение не может быть пустым.").max(2000, "Сообщение слишком длинное."),
   sentAt: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for sentAt").describe("Время отправки сообщения (серверный Timestamp)"),
+  type: z.enum(['text', 'system']).optional().default('text').describe("Тип сообщения: обычное текстовое или системное"),
   // isRead: z.boolean().default(false).optional(), // Для отслеживания прочтения, пока не используем
 });
 export type MessageData = z.infer<typeof messageSchema> & { id?: string }; // id будет добавлен после чтения из Firestore
@@ -182,5 +183,7 @@ export const chatSchema = z.object({
   lastMessageAt: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for lastMessageAt").optional().nullable().describe("Время последнего сообщения"),
   createdAt: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for createdAt").describe("Время создания чата (серверный Timestamp)"),
   // unreadCounts: z.record(z.string(), z.number().int().min(0)).optional(), // { [userId]: count } - пока не реализуем
+  taskStatus: z.string().optional().describe("Статус задания"),
+  taskPrice: z.union([z.string(), z.number()]).optional().describe("Цена задания"),
 });
 export type ChatData = z.infer<typeof chatSchema> & { id?: string }; // id будет добавлен после чтения из Firestore
