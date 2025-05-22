@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { FileText, LogIn, UserCircle, ListFilter, Briefcase, CalendarCheck2, ExternalLink, Loader2, AlertCircle } from "lucide-react";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
 import Link from "next/link";
@@ -45,27 +45,7 @@ export default function MyResponsesPage() {
   const [isLoadingResponses, setIsLoadingResponses] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!auth) {
-      setIsLoadingAuth(false);
-      setIsLoadingResponses(false);
-      return;
-    }
-    const unsubscribe = auth.onAuthStateChanged(currentUser => {
-      setUser(currentUser);
-      setIsLoadingAuth(false);
-      if (currentUser && db) {
-        fetchUserResponses(currentUser.uid);
-      } else {
-        setUserResponses([]);
-        setIsLoadingResponses(false);
-      }
-    });
-    
-    return () => unsubscribe();
-  }, []);
-
-  const fetchUserResponses = async (userId: string, attemptFallback = true) => {
+  const fetchUserResponses = useCallback(async (userId: string, attemptFallback = true) => {
     if (!db) {
       console.error("Firestore (db) is not initialized. Cannot fetch responses.");
       setError("База данных не инициализирована. Попробуйте перезагрузить страницу.");
@@ -76,6 +56,7 @@ export default function MyResponsesPage() {
     setIsLoadingResponses(true);
     setError(null);
     setUserResponses([]); 
+    let caughtFetchError: FirestoreError | null = null;
     
     try {
       console.log(`Fetching responses for userId: ${userId}, attemptFallback: ${attemptFallback}`);
@@ -124,29 +105,49 @@ export default function MyResponsesPage() {
       
       setUserResponses(responses);
       
-    } catch (err: any) {
-      const caughtError = err as FirestoreError; // Используем новую переменную
-      console.error("Error fetching user responses:", caughtError);
+    } catch (rawError: unknown) {
+      caughtFetchError = rawError as FirestoreError; 
+      console.error("Error fetching user responses:", caughtFetchError);
       
-      if (attemptFallback && caughtError.code === 'failed-precondition' && caughtError.message.includes('index')) {
+      if (attemptFallback && caughtFetchError.code === 'failed-precondition' && caughtFetchError.message.includes('index')) {
         setError("Для корректной работы этой страницы требуется создание индекса в Firebase Firestore. Пытаюсь загрузить данные без сортировки... Пожалуйста, создайте рекомендованный индекс, перейдя по ссылке из консоли ошибок.");
         fetchUserResponses(userId, false); 
         return; 
-      } else if (!attemptFallback && caughtError.code === 'failed-precondition') {
-         setError(`Ошибка загрузки данных: ${caughtError.message}. Возможно, требуется создание или изменение индекса в Firestore. Пожалуйста, проверьте консоль ошибок на наличие ссылки для создания индекса.`);
+      } else if (!attemptFallback && caughtFetchError.code === 'failed-precondition') {
+         setError(`Ошибка загрузки данных: ${caughtFetchError.message}. Возможно, требуется создание или изменение индекса в Firestore. Пожалуйста, проверьте консоль ошибок на наличие ссылки для создания индекса.`);
       } else {
-        setError(`Произошла ошибка при загрузке откликов: ${caughtError.message || 'Неизвестная ошибка'}`);
+        setError(`Произошла ошибка при загрузке откликов: ${caughtFetchError.message || 'Неизвестная ошибка'}`);
       }
       setUserResponses([]); // Очищаем отклики при любой ошибке
     } finally {
         // Устанавливаем isLoadingResponses в false только если это был не первый (основной) вызов, 
         // который рекурсивно вызвал фоллбэк, или если это был фоллбэк вызов.
-        const isStillAttemptingFallback = attemptFallback && (err as FirestoreError)?.code === 'failed-precondition' && (err as FirestoreError)?.message.includes('index');
+        const isStillAttemptingFallback = attemptFallback && caughtFetchError?.code === 'failed-precondition' && caughtFetchError?.message.includes('index');
         if (!isStillAttemptingFallback) {
              setIsLoadingResponses(false);
         }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!auth) {
+      setIsLoadingAuth(false);
+      setIsLoadingResponses(false);
+      return;
+    }
+    const unsubscribe = auth.onAuthStateChanged(currentUser => {
+      setUser(currentUser);
+      setIsLoadingAuth(false);
+      if (currentUser && db) {
+        fetchUserResponses(currentUser.uid);
+      } else {
+        setUserResponses([]);
+        setIsLoadingResponses(false);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [fetchUserResponses]);
 
   if (isLoadingAuth) {
     return (

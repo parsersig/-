@@ -1,6 +1,6 @@
 
 import { z } from 'zod';
-import type { Timestamp } from 'firebase/firestore'; // Используем type import для Timestamp
+import { Timestamp } from 'firebase/firestore'; // Используем type import для Timestamp
 
 export const taskCategories = [
   "Ремонт и строительство", 
@@ -155,7 +155,7 @@ export const reviewSchema = z.object({
   comment: z.string().min(10, "Комментарий должен содержать минимум 10 символов.").max(1000, "Комментарий не должен превышать 1000 символов."),
   createdAt: z.custom<Timestamp>((val) => val instanceof Timestamp, "Invalid Timestamp for createdAt").optional(), 
 });
-export type ReviewData = z.infer<typeof reviewSchema>;
+export type ReviewData = z.infer<typeof reviewSchema> & { id: string };
 
 
 // --- Схемы для Чата ---

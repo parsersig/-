@@ -131,7 +131,7 @@ export default function CreateTaskPage() {
           await addDoc(collection(db, "notifications"), {
             taskId: docRef.id,
             taskTitle: data.title,
-            message: `Новое задание опубликовано: "${data.title}"`,
+            message: `Новое задание опубликовано: &quot;${data.title}&quot;`,
             createdAt: serverTimestamp(),
             read: false, 
             type: "new_task", 
@@ -147,7 +147,7 @@ export default function CreateTaskPage() {
         description: (
           <div className="flex flex-col gap-2">
             <p>Ваше задание «{data.title}» сохранено и теперь доступно для просмотра всеми пользователями.</p>
-            {currentUser && <p className="text-xs text-muted-foreground">Оно будет видно в разделе "Мои задания".</p>}
+            {currentUser && <p className="text-xs text-muted-foreground">Оно будет видно в разделе &quot;Мои задания&quot;.</p>}
             <div className="flex gap-2 mt-2">
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/tasks/${docRef.id}`} className="flex items-center">
@@ -200,7 +200,7 @@ export default function CreateTaskPage() {
                   <FormItem>
                     <FormLabel className="text-md sm:text-lg flex items-center"><FileText className="h-5 w-5 mr-2 text-accent/80" />Название задания</FormLabel>
                     <FormControl>
-                      <Input placeholder="Например, 'Нужен ремонт стиральной машины'" {...field} className="h-12 text-base" />
+                      <Input placeholder="Например, &apos;Нужен ремонт стиральной машины&apos;" {...field} className="h-12 text-base" />
                     </FormControl>
                     <FormDescription className="text-xs sm:text-sm">
                       Кратко и понятно опишите суть задачи.

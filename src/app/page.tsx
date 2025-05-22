@@ -299,7 +299,7 @@ export default function HomePage() {
                       <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
                     ))}
                   </div>
-                  <p className="text-muted-foreground italic mb-4 text-sm">"{testimonial.text}"</p>
+                  <p className="text-muted-foreground italic mb-4 text-sm">&quot;{testimonial.text}&quot;</p>
                 </CardContent>
                 <CardFooter className="pt-4 border-t mt-auto">
                   <div className="text-left w-full">

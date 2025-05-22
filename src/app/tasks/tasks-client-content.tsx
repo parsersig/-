@@ -2,7 +2,7 @@
 // src/app/tasks/tasks-client-content.tsx
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +35,11 @@ export default function TasksClientContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const taskOwnersRef = useRef(taskOwners);
+
+  useEffect(() => {
+    taskOwnersRef.current = taskOwners;
+  }, [taskOwners]);
 
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category');
@@ -92,7 +97,7 @@ export default function TasksClientContent() {
           // ownerDisplayName будет загружен отдельно
         };
         tasksFromFirestore.push(taskItem);
-        if (data.userId && taskOwners[data.userId] === undefined) {
+          if (data.userId && taskOwnersRef.current[data.userId] === undefined) {
           ownerIdsToFetch.add(data.userId);
         }
       });

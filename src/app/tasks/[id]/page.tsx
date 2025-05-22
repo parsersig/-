@@ -1,5 +1,4 @@
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -8,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Briefcase, CalendarDays, Coins, Eye, MapPin, MessageSquare, UserCircle, Loader2, AlertCircle, Users, Check, X, ThumbsUp, ThumbsDown, User, PlayCircle } from "lucide-react";
 import type { StoredTask, ResponseData, UserProfile, ChatData } from "@/lib/schemas";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,7 @@ import {
 } from "firebase/firestore";
 import type { User as FirebaseUser } from "firebase/auth";
 
-const formatDate = (date: any): string => {
+const formatDate = (date: Timestamp | string | number | Date | null | undefined): string => {
   if (!date) return "Дата не указана";
   let d: Date;
   if (date instanceof Timestamp) {
@@ -34,7 +34,7 @@ const formatDate = (date: any): string => {
   return d.toLocaleDateString("ru-RU", { year: "numeric", month: "long", day: "numeric" });
 };
 
-const formatResponseDate = (date: any): string => {
+const formatResponseDate = (date: Timestamp | string | number | Date | null | undefined): string => {
   if (!date) return 'неизвестно';
   let d: Date;
   if (date instanceof Timestamp) {
@@ -48,7 +48,7 @@ const formatResponseDate = (date: any): string => {
   return d.toLocaleString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-const formatStartedDate = (date: any): string => {
+const formatStartedDate = (date: Timestamp | string | number | Date | null | undefined): string => {
   if (!date) return "не указана";
   let d: Date;
   if (date instanceof Timestamp) {
@@ -124,14 +124,14 @@ export default function TaskDetailPage() {
           const taskRef = doc(firestore, "tasks", taskId);
           const taskSnap = await getDoc(taskRef);
           if (taskSnap.exists()) {
-            const taskData = taskSnap.data() as StoredTask; // Assuming StoredTask has all needed fields
+            const taskData = taskSnap.data() as StoredTask; 
             const fetchedTask = {
               ...taskData,
               id: taskSnap.id,
-              postedDate: formatDate(taskData.postedDate as Timestamp),
-              firestorePostedDate: taskData.postedDate as Timestamp,
-              startedAt: taskData.startedAt ? formatStartedDate(taskData.startedAt as Timestamp) : undefined,
-              firestoreStartedAt: taskData.startedAt as Timestamp | undefined,
+              postedDate: formatDate(taskData.postedDate as Timestamp), // Assuming postedDate is Timestamp
+              firestorePostedDate: taskData.postedDate as Timestamp, // Assuming postedDate is Timestamp
+              startedAt: taskData.startedAt ? formatStartedDate(taskData.startedAt as Timestamp) : undefined, // Assuming startedAt is Timestamp
+              firestoreStartedAt: taskData.startedAt as Timestamp | undefined, // Assuming startedAt is Timestamp
             } as StoredTask;
             setTask(fetchedTask);
 
@@ -145,8 +145,8 @@ export default function TaskDetailPage() {
                 } else {
                   setTaskOwner(null);
                 }
-              } catch (ownerError) {
-                console.error("Error fetching task owner profile:", ownerError);
+              } catch (ownerError: unknown) {
+                console.error("Error fetching task owner profile:", ownerError instanceof Error ? ownerError.message : String(ownerError));
                 setTaskOwner(null);
               } finally {
                 setIsLoadingOwner(false);
@@ -156,12 +156,12 @@ export default function TaskDetailPage() {
           } else {
             setTask(null);
           }
-        } catch (error) {
-          console.error("Error fetching task from Firestore:", error);
+        } catch (error: unknown) {
+          console.error("Error fetching task from Firestore:", error instanceof Error ? error.message : String(error));
           setTask(null);
           toast({
             title: "Ошибка загрузки",
-            description: "Не удалось загрузить детали задания. Попробуйте позже.",
+            description: (error instanceof Error ? error.message : 'Не удалось загрузить детали задания. Попробуйте позже.'),
             variant: "destructive",
           });
         } finally {
@@ -300,9 +300,9 @@ export default function TaskDetailPage() {
         duration: 7000 
       });
       setHasResponded(true);
-    } catch (error: any) {
-      console.error("Failed to save response to Firestore", error);
-      toast({ title: "Ошибка сохранения отклика", description: `Не удалось сохранить ваш отклик. ${error.message || "Пожалуйста, попробуйте еще раз."}`, variant: "destructive" });
+    } catch (error: unknown) {
+      console.error("Failed to save response to Firestore", error instanceof Error ? error.message : String(error));
+      toast({ title: "Ошибка сохранения отклика", description: `Не удалось сохранить ваш отклик. ${(error instanceof Error ? error.message : String(error)) || "Пожалуйста, попробуйте еще раз."}`, variant: "destructive" });
     } finally {
       setIsResponding(false);
     }
@@ -337,9 +337,9 @@ export default function TaskDetailPage() {
       setIsExecutor(true); 
 
       toast({ title: "Работа начата!", description: `Вы приступили к выполнению задания «${task.title}».`, duration: 5000 });
-    } catch (error: any) {
-      console.error("Error starting task:", error);
-      toast({ title: "Ошибка", description: `Не удалось начать выполнение задания: ${error.message}`, variant: "destructive" });
+    } catch (error: unknown) {
+      console.error("Error starting task:", error instanceof Error ? error.message : String(error));
+      toast({ title: "Ошибка", description: `Не удалось начать выполнение задания: ${error instanceof Error ? error.message : String(error)}`, variant: "destructive" });
     } finally {
       setIsProcessingAction(false);
     }
@@ -384,9 +384,9 @@ export default function TaskDetailPage() {
             console.log("Chat already exists with ID:", generatedChatId);
         }
         router.push(`/messages?chatId=${generatedChatId}`);
-    } catch (error: any) {
-        console.error("Error initiating chat:", error);
-        toast({ title: "Ошибка чата", description: `Не удалось начать чат: ${error.message}`, variant: "destructive" });
+    } catch (error: unknown) {
+        console.error("Error initiating chat:", error instanceof Error ? error.message : String(error));
+        toast({ title: "Ошибка чата", description: `Не удалось начать чат: ${error instanceof Error ? error.message : String(error)}`, variant: "destructive" });
     } finally {
         setIsInitiatingChat(false);
     }
@@ -589,7 +589,7 @@ export default function TaskDetailPage() {
                       <div className="flex-1">
                         <p className="font-semibold text-foreground">{response.responderName || "Анонимный исполнитель"}</p>
                         <p className="text-xs text-muted-foreground">Откликнулся: {response.respondedAt}</p>
-                        {response.message && <p className="text-sm mt-1 italic">"{response.message}"</p>}
+                        {response.message && <p className="text-sm mt-1 italic">&quot;{response.message}&quot;</p>}
                       </div>
                        {currentUser && response.responderId && (
                          <Button 

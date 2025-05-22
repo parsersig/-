@@ -103,7 +103,19 @@ export default function ProfilePage() {
       const fetchedReviews: ReviewData[] = [];
       let totalRating = 0;
       reviewsSnapshot.forEach(docSnap => {
-        const review = { id: docSnap.id, ...docSnap.data() } as ReviewData;
+        const data = docSnap.data();
+        const review: ReviewData = {
+          id: docSnap.id,
+          reviewerId: data.reviewerId, // Mapping reviewerId from Firestore
+          reviewerName: data.reviewerName,
+          reviewerPhotoURL: data.reviewerPhotoURL,
+          reviewedUserId: data.reviewedUserId,
+          rating: data.rating,
+          comment: data.comment,
+          createdAt: data.createdAt,
+          taskId: data.taskId,
+          taskTitle: data.taskTitle
+        };
         fetchedReviews.push(review);
         if (review.rating) {
           totalRating += review.rating;
@@ -275,7 +287,7 @@ export default function ProfilePage() {
             <CardContent>
               {isLoadingProfile && <p className="text-sm text-muted-foreground">Загрузка...</p>}
               {!isLoadingProfile && userProfile?.aboutMe && <p className="text-sm text-muted-foreground whitespace-pre-line">{userProfile.aboutMe}</p>}
-              {!isLoadingProfile && !userProfile?.aboutMe && <p className="text-sm text-muted-foreground italic">Информация о себе еще не добавлена. Вы можете добавить ее, нажав "Редактировать профиль".</p>}
+              {!isLoadingProfile && !userProfile?.aboutMe && <p className="text-sm text-muted-foreground italic">Информация о себе еще не добавлена. Вы можете добавить ее, нажав &quot;Редактировать профиль&quot;.</p>}
             </CardContent>
           </Card>
 
@@ -291,7 +303,7 @@ export default function ProfilePage() {
                 </div>
               )}
               {!isLoadingProfile && (!userProfile?.specializations || userProfile.specializations.length === 0) && (
-                <p className="text-sm text-muted-foreground italic">Специализации еще не выбраны. Вы можете добавить их, нажав "Редактировать профиль".</p>
+                <p className="text-sm text-muted-foreground italic">Специализации еще не выбраны. Вы можете добавить их, нажав &quot;Редактировать профиль&quot;.</p>
               )}
             </CardContent>
           </Card>
@@ -371,7 +383,7 @@ export default function ProfilePage() {
                            Отзыв к заданию: <Link href={`/tasks/${review.taskId}`} className="text-accent hover:underline">{review.taskTitle}</Link>
                          </p>
                       )}
-                      <p className="text-sm text-muted-foreground italic">"{review.comment}"</p>
+                      <p className="text-sm text-muted-foreground italic">&quot;{review.comment}&quot;</p>
                     </div>
                   </div>
                 </Card>

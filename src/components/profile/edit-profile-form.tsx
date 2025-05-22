@@ -41,7 +41,7 @@ export default function EditProfileForm({ currentUser, initialProfileData, onPro
     resolver: zodResolver(editUserProfileSchema),
     defaultValues: {
       displayName: initialProfileData?.displayName || currentUser.displayName || "",
-      photoURL: initialProfileData?.photoURL || currentUser.photoURL || "",
+      photoURL: (initialProfileData?.photoURL || currentUser.photoURL) ?? undefined,
       aboutMe: initialProfileData?.aboutMe || "",
       specializations: initialProfileData?.specializations || [],
       city: initialProfileData?.city || "Ирбит",
