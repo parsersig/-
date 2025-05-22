@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"; // DialogClose убрана, т.к. закрытие управляется isEditDialogOpen
 import { UserCircle, LogIn, Edit, Mail, ShieldCheck, CalendarDays, Briefcase, Star, TrendingUp, Clock, ListChecks, Loader2 } from "lucide-react";
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation'; // Added useRouter
 import { auth, db } from '@/lib/firebase';
 import type { User } from 'firebase/auth';
-import { doc, getDoc, setDoc, Timestamp, collection, query, where, getDocs, getCountFromServer, orderBy } from "firebase/firestore"; // Добавлены нужные импорты
+import { doc, getDoc, setDoc, Timestamp, collection, query, where, getDocs, getCountFromServer, orderBy, addDoc, serverTimestamp } from "firebase/firestore"; // Added addDoc, serverTimestamp
 import Link from "next/link";
 import EditProfileForm from "@/components/profile/edit-profile-form";
 import type { UserProfile, EditUserProfileFormValues, ReviewData } from "@/lib/schemas"; // Добавлен ReviewData
@@ -40,6 +41,9 @@ export default function ProfilePage() {
   const [reviewsCount, setReviewsCount] = useState<number>(0);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+  const [isLoadingChatAction, setIsLoadingChatAction] = useState(false); // Added state for chat action
+
+  const router = useRouter(); // Initialized useRouter
 
   const fetchUserProfileAndStats = useCallback(async (currentUser: User) => {
     if (!db || !currentUser?.uid) return;
@@ -167,6 +171,73 @@ export default function ProfilePage() {
     // Можно добавить toast об успешном обновлении, если EditProfileForm его еще не показывает
   };
 
+  const handleWriteMessage = async () => {
+    if (!user || !userProfile || !user.uid || !userProfile.uid) {
+      console.error("User or profile data is missing.");
+      // Optionally show a toast message to the user: alert("User or profile data is missing.");
+      return;
+    }
+
+    if (user.uid === userProfile.uid) {
+      console.log("Cannot start a chat with yourself.");
+      // Button should ideally be disabled, but this is a safeguard
+      return;
+    }
+
+    const currentUserId = user.uid;
+    const profileUserId = userProfile.uid;
+
+    setIsLoadingChatAction(true);
+
+    try {
+      const chatsRef = collection(db, "chats");
+      const sortedParticipants = [currentUserId, profileUserId].sort();
+      
+      // Query for existing chat with sorted participants
+      const q = query(chatsRef, where("participants", "==", sortedParticipants));
+      const querySnapshot = await getDocs(q);
+
+      let existingChatId: string | null = null;
+      if (!querySnapshot.empty) {
+        // Assuming 'participants' field uniquely identifies the chat for two users
+        existingChatId = querySnapshot.docs[0].id;
+      }
+
+      if (existingChatId) {
+        router.push(`/messages?chatId=${existingChatId}`);
+      } else {
+        // Create new chat
+        const currentUserDisplayName = user.displayName || userProfile?.email?.split('@')[0] || "Пользователь";
+        const profileUserDisplayName = userProfile.displayName || userProfile?.email?.split('@')[0] || "Пользователь";
+        
+        const currentUserPhoto = user.photoURL;
+        const profileUserPhoto = userProfile.photoURL;
+
+        const newChatData = {
+          participants: sortedParticipants, // Store sorted IDs
+          participantNames: {
+            [currentUserId]: currentUserDisplayName,
+            [profileUserId]: profileUserDisplayName,
+          },
+          participantPhotoURLs: {
+            [currentUserId]: currentUserPhoto || null,
+            [profileUserId]: profileUserPhoto || null,
+          },
+          lastMessageText: "",
+          lastMessageAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        };
+        const chatDocRef = await addDoc(collection(db, "chats"), newChatData);
+        router.push(`/messages?chatId=${chatDocRef.id}`);
+      }
+    } catch (error) {
+      console.error("Error handling message action:", error);
+      // Show toast: alert("Не удалось начать чат. Попробуйте позже.");
+    } finally {
+      setIsLoadingChatAction(false);
+    }
+  };
+
   if (isLoadingAuth || (user && (isLoadingProfile || isLoadingStats || isLoadingReviews))) {
     return (
       <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
@@ -233,16 +304,18 @@ export default function ProfilePage() {
             <CardTitle className="text-3xl sm:text-4xl font-bold mb-1">{displayName}</CardTitle>
             <CardDescription className="text-lg text-muted-foreground mb-3">{userProfile?.city || "Ирбит"} • {userProfile?.age ? `${userProfile.age} лет` : "Возраст не указан"}</CardDescription> 
             <div className="flex flex-wrap gap-2 justify-center md:justify-start mb-4">
-              <Badge variant="secondary" className="text-sm py-1 px-3 bg-green-600/20 text-green-400 border-green-500/40">Исполнитель</Badge>
               <Badge variant="secondary" className="text-sm py-1 px-3 bg-blue-600/20 text-blue-400 border-blue-500/40">Проверен</Badge>
             </div>
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="lg" className="w-full sm:w-auto hover-scale">
+            {/* Buttons Wrapper Div */}
+            <div className="flex flex-wrap gap-2 justify-center md:justify-start mt-4">
+              {/* Edit Profile Button and Dialog */}
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="lg" className="w-full sm:w-auto hover-scale">
                     <Edit className="h-5 w-5 mr-2" /> Редактировать профиль
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle className="text-2xl">Редактирование профиля</DialogTitle>
                     <DialogDescription>
@@ -259,12 +332,33 @@ export default function ProfilePage() {
                         />
                     )}
                   </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+              {/* Write Message Button */}
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="w-full sm:w-auto hover-scale" 
+                onClick={handleWriteMessage}
+                disabled={!userProfile || user?.uid === userProfile?.uid || !user || isLoadingChatAction}
+              >
+                {isLoadingChatAction ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Загрузка...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-5 w-5 mr-2" />
+                    Написать сообщение
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
-
+      
       <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
         {/* Левая колонка: О себе, Специализации */}
         <div className="md:col-span-2 space-y-6 sm:space-y-8">
